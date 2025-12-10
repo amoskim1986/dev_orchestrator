@@ -1,0 +1,17 @@
+{
+  "name": "dev-orchestrator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Multi-universe development environment orchestrator",
+  "workspaces": [
+    "local-app",
+    "web-app",
+    "shared"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=local-app",
+    "build": "npm run build --workspace=local-app"
+  },
+  "author": "",
+  "license": "MIT"
+}

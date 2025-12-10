@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -56,7 +56,9 @@ next-env.d.ts
 SEO_STRATEGY.md
 SEO_ANALYSIS_CREDIT_UNION.md
 /BANK_GRAPHQL_QUERIES.md
-CLAUDE.md
+# CLAUDE.md - keep this tracked for the orchestrator project
+dist-electron
+dist
 /docs/plans/*.md
 /SEO_TRACKING.md
 /DISTRESSEDPRO_REDIRECT_UPDATE.md
