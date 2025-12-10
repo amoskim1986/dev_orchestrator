@@ -13,5 +13,8 @@
     "build": "npm run build --workspace=local-app"
   },
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.4.11"
+  }
 }

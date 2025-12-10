@@ -1,12 +1,13 @@
 import { app, BrowserWindow } from 'electron'
 import path from 'path'
-
-// Check if running in development (electron-vite sets this)
-const isDev = !app.isPackaged
+import { registerHistoryIpc } from './ipc/history.ipc'
 
 let mainWindow: BrowserWindow | null = null
 
 function createWindow() {
+  // Use VITE_DEV_SERVER_URL env var set by electron-vite
+  const devServerUrl = process.env.VITE_DEV_SERVER_URL
+
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -21,9 +22,9 @@ function createWindow() {
     backgroundColor: '#1a1a1a',
   })
 
-  if (isDev) {
+  if (devServerUrl) {
     // In development, load from Vite dev server
-    mainWindow.loadURL('http://localhost:3010')
+    mainWindow.loadURL(devServerUrl)
     mainWindow.webContents.openDevTools()
   } else {
     mainWindow.loadFile(path.join(__dirname, '../../dist/index.html'))
@@ -34,7 +35,14 @@ function createWindow() {
   })
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Register IPC handlers
+  registerHistoryIpc()
+
+  // Dynamically import terminal IPC to avoid app.isPackaged at module load time
+  const { registerTerminalIpc } = await import('./ipc/terminal.ipc')
+  registerTerminalIpc()
+
   createWindow()
 
   app.on('activate', () => {
@@ -48,4 +56,10 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+// Cleanup on quit
+app.on('before-quit', async () => {
+  const { terminalWindowManager } = await import('./services/terminal-window')
+  terminalWindowManager.closeAll()
 })
