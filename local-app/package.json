@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
-    "preview": "electron-vite preview"
+    "preview": "electron-vite preview",
+    "postinstall": "electron-rebuild -f -w node-pty",
+    "rebuild": "electron-rebuild -f -w node-pty"
   },
   "keywords": [
     "electron",
@@ -19,10 +21,18 @@
     "node": ">=20.19.0"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.87.1",
+    "@tanstack/react-virtual": "^3.13.13",
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/addon-web-links": "^0.11.0",
+    "@xterm/xterm": "^5.5.0",
+    "node-pty": "^1.0.0",
     "react": "^18.3.0",
-    "react-dom": "^18.3.0"
+    "react-dom": "^18.3.0",
+    "zustand": "^5.0.9"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.2",
     "@types/node": "^20.0.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
