@@ -28,20 +28,44 @@ dev_orchestrator/
 └── README.md
 ```
 
+### Data Architecture Decision
+
+**We chose Supabase over local SQLite** for the data layer. This gives us:
+- Cloud sync from day one
+- Same backend works for both Electron app and future web app
+- No need for IPC-based database access (Supabase client runs in renderer)
+- Simpler architecture with fewer files
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     RENDERER (React)                            │
+│  ┌─────────────┐                                                │
+│  │ Component   │ ──calls──> supabase.from('projects').select()  │
+│  └─────────────┘                                                │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              │ HTTPS (Supabase JS Client)
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     SUPABASE (Cloud)                            │
+│  ┌─────────────────┐     ┌──────────────────┐                   │
+│  │ PostgREST API   │────>│ PostgreSQL       │                   │
+│  └─────────────────┘     └──────────────────┘                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ### Separation of Concerns
 
 | Capability | Local App | Web App |
 |------------|-----------|---------|
 | View projects & journeys | Yes | Yes |
-| Create/edit projects & journeys | Yes (local DB) | Yes (Supabase) |
+| Create/edit projects & journeys | Yes (Supabase) | Yes (Supabase) |
 | Git worktree operations | Yes | No (triggers local app) |
 | Launch Claude Code | Yes | No (triggers local app) |
 | Start/stop dev servers | Yes | No (triggers local app) |
 | Process monitoring | Yes | View status only |
-| Works offline | Yes | No |
-| Multi-device access | No | Yes |
-
-Eventually: Web app sends commands to local app via WebSocket/local API for machine-specific operations.
+| Works offline | Limited | No |
+| Multi-device access | Yes (data synced) | Yes |
 
 ---
 
@@ -52,20 +76,20 @@ Eventually: Web app sends commands to local app via WebSocket/local API for mach
 | Layer | Technology | Rationale |
 |-------|------------|-----------|
 | Desktop Shell | Electron | Cross-platform, native system access |
-| Frontend | React + TypeScript | Modern, type-safe UI development |
+| Frontend | React 18 + TypeScript | Modern, type-safe UI development |
 | Styling | Tailwind CSS | Rapid UI development |
-| State Management | Zustand | Lightweight, simple |
-| IPC Layer | Electron IPC | Main ↔ Renderer communication |
-| Local Storage | SQLite (better-sqlite3) | Structured data, offline-first |
-| Build Tool | Vite + electron-vite | Fast HMR |
+| State Management | React hooks + Supabase | Simple data fetching with hooks |
+| Database | Supabase (PostgreSQL) | Cloud-first, shared with web app |
+| Build Tool | Vite 5 + electron-vite | Fast HMR |
+| Node Version | 20.19+ (via nvm) | Required for Vite compatibility |
 
 ### Web App (`/web-app`) - Future
 
 | Layer | Technology |
 |-------|------------|
-| Framework | Next.js |
-| Database | Supabase (Postgres) |
-| Auth | Supabase Auth |
+| Framework | Next.js or Vite + React |
+| Database | Supabase (same as local app) |
+| Auth | Optional - currently using service_role key |
 | Styling | Tailwind CSS |
 
 ---
@@ -77,45 +101,37 @@ local-app/
 ├── electron/                    # Electron main process
 │   ├── main.ts                  # Entry point
 │   ├── preload.ts               # Secure bridge to renderer
-│   ├── ipc/                     # IPC handlers
-│   │   ├── projects.ts
-│   │   ├── journeys.ts
-│   │   ├── worktrees.ts
-│   │   ├── processes.ts
-│   │   └── claude.ts
-│   ├── services/                # Business logic
-│   │   ├── git.service.ts       # Git/worktree operations
-│   │   ├── process.service.ts   # Server management
-│   │   ├── port.service.ts      # Port allocation
-│   │   └── claude.service.ts    # Claude Code launcher
-│   └── database/
-│       ├── schema.sql
-│       ├── migrations/
-│       └── db.ts
+│   ├── ipc/                     # IPC handlers (for system operations)
+│   │   ├── worktrees.ts         # Git worktree operations
+│   │   ├── processes.ts         # Server management
+│   │   └── claude.ts            # Claude Code launcher
+│   └── services/                # Business logic
+│       ├── git.service.ts       # Git/worktree operations
+│       ├── process.service.ts   # Server management
+│       ├── port.service.ts      # Port allocation
+│       └── claude.service.ts    # Claude Code launcher
 ├── src/                         # React renderer
 │   ├── App.tsx
 │   ├── main.tsx
 │   ├── components/
 │   │   ├── layout/
-│   │   │   ├── Sidebar.tsx
-│   │   │   └── Header.tsx
 │   │   ├── projects/
-│   │   │   ├── ProjectList.tsx
-│   │   │   └── ProjectCard.tsx
 │   │   ├── journeys/
-│   │   │   ├── JourneyBoard.tsx
-│   │   │   ├── JourneyCard.tsx
-│   │   │   └── JourneyActions.tsx
 │   │   └── common/
-│   │       ├── StatusBadge.tsx
-│   │       └── Button.tsx
-│   ├── stores/
-│   │   ├── projectStore.ts
-│   │   └── journeyStore.ts
-│   ├── hooks/
-│   │   └── useElectron.ts
+│   ├── hooks/                   # Data hooks (Supabase)
+│   │   ├── useProjects.ts
+│   │   └── useJourneys.ts
+│   ├── lib/
+│   │   └── supabase.ts          # Supabase client
 │   └── types/
-│       └── index.ts
+│       ├── index.ts             # Entity types
+│       └── database.ts          # Supabase DB types
+├── supabase/
+│   └── migrations/
+│       └── 001_initial_schema.sql
+├── .env                         # Supabase credentials (gitignored)
+├── .env.example                 # Template for credentials
+├── .nvmrc                       # Node version (20.19.5)
 ├── package.json
 ├── electron.vite.config.ts
 ├── tailwind.config.js
@@ -126,131 +142,101 @@ local-app/
 
 ## Implementation Phases & Checklists
 
-### Phase 0: Repository Setup
+### Phase 0: Repository Setup ✅ COMPLETE
 
 **Goal**: Set up monorepo structure
 
-- [ ] Create folder structure:
-  ```bash
-  mkdir -p local-app web-app shared
-  ```
-
-- [ ] Initialize root package.json (optional - for workspace management)
-  ```json
-  {
-    "name": "dev-orchestrator",
-    "private": true,
-    "workspaces": ["local-app", "web-app", "shared"]
-  }
-  ```
-
-- [ ] Update .gitignore for all sub-projects
+- [x] Create folder structure (`local-app/`, `web-app/`, `shared/`)
+- [x] Initialize root package.json with workspaces
+- [x] Update .gitignore for all sub-projects
 
 **Validation**: Clean folder structure ready for development
 
 ---
 
-### Phase 1: Local App Scaffolding
+### Phase 1: Local App Scaffolding ✅ COMPLETE
 
 **Goal**: Get a working Electron + React app running
 
-- [ ] Navigate to local-app folder
-  ```bash
-  cd local-app
-  ```
+- [x] Initialize local-app with npm
+- [x] Install core dependencies (electron, react, vite, tailwind)
+- [x] Create `electron.vite.config.ts` with separate output dirs
+- [x] Create `tsconfig.json`
+- [x] Set up Tailwind CSS
+- [x] Create `electron/main.ts` with basic window creation
+- [x] Create `electron/preload.ts` with contextBridge setup
+- [x] Create React entry point and App component
+- [x] Configure dev server on port 3010
+- [x] Set up Node 20.19+ via `.nvmrc`
 
-- [ ] Initialize npm project
-  ```bash
-  npm init -y
-  ```
+**Key files created**:
+- `electron/main.ts` - Uses `!app.isPackaged` for dev detection
+- `electron.vite.config.ts` - Outputs to `dist-electron/main/` and `dist-electron/preload/`
+- `.nvmrc` - Specifies Node 20.19.5
 
-- [ ] Install core dependencies
-  ```bash
-  npm install electron react react-dom
-  npm install -D electron-vite vite typescript
-  npm install -D @types/react @types/react-dom @types/node
-  npm install -D tailwindcss postcss autoprefixer
-  ```
-
-- [ ] Create `electron.vite.config.ts`
-- [ ] Create `tsconfig.json` (with paths for electron/ and src/)
-- [ ] Create `tailwind.config.js` and `postcss.config.js`
-- [ ] Initialize Tailwind: `npx tailwindcss init -p`
-- [ ] Set up folder structure (electron/, src/)
-- [ ] Create `electron/main.ts` with basic window creation
-- [ ] Create `electron/preload.ts` with contextBridge setup
-- [ ] Create `src/main.tsx` React entry point
-- [ ] Create `src/App.tsx` with "Hello Orchestrator"
-- [ ] Create `src/index.css` with Tailwind directives
-- [ ] Add npm scripts to `package.json`:
-  ```json
-  {
-    "scripts": {
-      "dev": "electron-vite dev",
-      "build": "electron-vite build",
-      "preview": "electron-vite preview"
-    }
-  }
-  ```
-
-**Validation**: Run `npm run dev` and see Electron window with React content
+**Validation**: `npm run dev` shows Electron window with React content
 
 ---
 
-### Phase 2: Database & Data Layer
+### Phase 2: Database & Data Layer ✅ COMPLETE
 
-**Goal**: Persistent local storage for projects and journeys
+**Goal**: Persistent cloud storage for projects and journeys
 
-- [ ] Install SQLite dependencies
-  ```bash
-  npm install better-sqlite3
-  npm install -D @types/better-sqlite3
-  ```
+**Approach Changed**: Using Supabase instead of local SQLite
 
-- [ ] Create database schema (`electron/database/schema.sql`):
+- [x] Set up Supabase project
+- [x] Install `@supabase/supabase-js`
+- [x] Create database schema in Supabase:
   ```sql
-  CREATE TABLE IF NOT EXISTS projects (
-    id TEXT PRIMARY KEY,
+  -- projects table
+  CREATE TABLE projects (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     root_path TEXT NOT NULL UNIQUE,
-    frontend_path TEXT,           -- relative path to frontend
-    backend_path TEXT,            -- relative path to backend
+    frontend_path TEXT,
+    backend_path TEXT,
     frontend_start_cmd TEXT DEFAULT 'npm run dev',
     backend_start_cmd TEXT DEFAULT 'rails s',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
   );
 
-  CREATE TABLE IF NOT EXISTS journeys (
-    id TEXT PRIMARY KEY,
-    project_id TEXT NOT NULL,
+  -- journeys table (branch_name/worktree_path NULL until started)
+  CREATE TABLE journeys (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     description TEXT,
-    branch_name TEXT NOT NULL,
+    branch_name TEXT,
     worktree_path TEXT,
-    status TEXT DEFAULT 'planning',
+    status TEXT DEFAULT 'planning' CHECK (status IN ('planning', 'in_progress', 'ready', 'deployed')),
     rails_port INTEGER,
     react_port INTEGER,
     rails_pid INTEGER,
     react_pid INTEGER,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
   );
-
-  CREATE INDEX idx_journeys_project ON journeys(project_id);
-  CREATE INDEX idx_journeys_status ON journeys(status);
   ```
+- [x] Create `src/lib/supabase.ts` - Supabase client (using service_role key)
+- [x] Create `src/types/index.ts` - TypeScript types
+- [x] Create `src/hooks/useProjects.ts` - CRUD hook
+- [x] Create `src/hooks/useJourneys.ts` - CRUD hook with `startJourney` helper
+- [x] Create `.env.example` template
+- [x] Test CRUD operations via REST API
 
-- [ ] Create `electron/database/db.ts` - database initialization & helpers
-- [ ] Create IPC handlers for CRUD operations:
-  - `electron/ipc/projects.ts` - project CRUD
-  - `electron/ipc/journeys.ts` - journey CRUD
-- [ ] Register IPC handlers in `main.ts`
-- [ ] Expose IPC methods via `preload.ts`
-- [ ] Create `src/hooks/useElectron.ts` for typed IPC calls
+**Key files created**:
+- `src/lib/supabase.ts` - Uses `VITE_SUPABASE_SERVICE_ROLE_KEY`
+- `src/hooks/useProjects.ts` - `fetchProjects`, `createProject`, `updateProject`, `deleteProject`
+- `src/hooks/useJourneys.ts` - Same + `startJourney(id, branchName, worktreePath)`
+- `supabase/migrations/001_initial_schema.sql` - Migration file for reference
 
-**Validation**: Can create/read/update/delete projects and journeys via DevTools console
+**Connection string** (for migrations):
+```bash
+psql -h aws-0-us-west-2.pooler.supabase.com -p 6543 -d postgres -U postgres.bxkxrzbgnfdurlshrgzu
+```
+
+**Validation**: Can create/read/update/delete projects and journeys via Supabase
 
 ---
 
@@ -263,43 +249,6 @@ local-app/
   npm install zustand uuid
   npm install -D @types/uuid
   ```
-
-- [ ] Create type definitions (`src/types/index.ts`):
-  ```typescript
-  export type JourneyStatus = 'planning' | 'in_progress' | 'ready' | 'deployed';
-  export type ServerStatus = 'stopped' | 'starting' | 'running' | 'error';
-
-  export interface Project {
-    id: string;
-    name: string;
-    rootPath: string;
-    frontendPath?: string;
-    backendPath?: string;
-    frontendStartCmd: string;
-    backendStartCmd: string;
-    createdAt: string;
-  }
-
-  export interface Journey {
-    id: string;
-    projectId: string;
-    name: string;
-    description?: string;
-    branchName: string;
-    worktreePath?: string;
-    status: JourneyStatus;
-    railsPort?: number;
-    reactPort?: number;
-    railsPid?: number;
-    reactPid?: number;
-    createdAt: string;
-  }
-  ```
-
-- [ ] Create Zustand stores:
-  - `src/stores/projectStore.ts` - projects state + actions
-  - `src/stores/journeyStore.ts` - journeys state + actions
-  - `src/stores/uiStore.ts` - selected project, UI state
 
 - [ ] Create layout components:
   - `Sidebar.tsx` - project list navigation
@@ -322,7 +271,14 @@ local-app/
   - `Modal.tsx` - modal wrapper
   - `Input.tsx` - styled input
 
+- [ ] Wire up data:
+  - Use `useProjects()` hook to load projects
+  - Use `useJourneys(projectId)` hook to load journeys
+  - Handle loading and error states
+
 - [ ] Style with Tailwind (dark theme for dev tool aesthetic)
+
+**Note**: No Zustand stores needed - the Supabase hooks already manage state!
 
 **Validation**: Can view projects in sidebar, see journey board, UI is navigable
 
@@ -353,22 +309,25 @@ local-app/
 - [ ] Create `electron/ipc/worktrees.ts` IPC handlers
 - [ ] Expose worktree methods in preload.ts
 
-- [ ] Update Journey creation flow:
-  - Auto-generate branch name from journey name (slugify)
-  - Create worktree in `{repoPath}/worktrees/{journey-slug}/`
-  - Store worktree path in database
+- [ ] Update Journey "Start" flow:
+  - Journey starts in 'planning' status with NULL branch/worktree
+  - User clicks "Start Journey" → auto-generates branch name from journey name
+  - Creates worktree in `{repoPath}/.worktrees/{journey-slug}/`
+  - Updates journey with `startJourney(id, branchName, worktreePath)`
+  - Status changes to 'in_progress'
 
 - [ ] Add UI elements:
   - Git status indicator on journey card
-  - Branch name display
+  - Branch name display (only shown after started)
   - "Push Branch" action button
+  - "Start Journey" button for planning journeys
 
 - [ ] Handle journey deletion:
   - Confirm dialog
-  - Remove worktree
+  - Remove worktree (if exists)
   - Delete from database
 
-**Validation**: Creating journey creates worktree, deleting cleans up
+**Validation**: Starting journey creates worktree, deleting cleans up
 
 ---
 
@@ -377,8 +336,8 @@ local-app/
 **Goal**: Launch Claude Code in correct worktree context
 
 - [ ] Research Claude Code CLI/launch options:
-  - macOS: Check for `claude` CLI or app bundle
-  - Fallback: Open folder in VS Code if Claude not found
+  - macOS: Check for `claude` CLI in PATH
+  - Fallback: Open folder in VS Code or Terminal
 
 - [ ] Create `electron/services/claude.service.ts`:
   ```typescript
@@ -390,12 +349,13 @@ local-app/
 - [ ] Create `electron/ipc/claude.ts` IPC handler
 
 - [ ] Add "Open in Claude Code" button to JourneyCard
-  - Primary action button
+  - Only enabled for started journeys (with worktree)
   - Shows error toast if Claude not found
 
-- [ ] Add fallback option:
-  - "Open in VS Code" as alternative
-  - "Open in Finder/Terminal"
+- [ ] Add fallback options:
+  - "Open in VS Code"
+  - "Open in Terminal"
+  - "Open in Finder"
 
 **Validation**: Clicking "Open in Claude Code" opens correct worktree
 
@@ -441,15 +401,15 @@ local-app/
 
 - [ ] Handle process lifecycle:
   - Track spawned processes in memory
-  - Update database with PIDs
+  - Update Supabase with PIDs and ports
   - Clean up on app quit (beforeunload)
-  - Handle process crashes (restart option)
+  - Handle process crashes
 
 - [ ] Update UI:
   - Server status dots on journey card (red/yellow/green)
   - "Start Servers" / "Stop Servers" buttons
   - "Open in Browser" button (opens localhost:port)
-  - Individual server controls (start/stop Rails, start/stop React)
+  - Individual server controls
 
 - [ ] Add process output viewer (optional):
   - Expandable console panel
@@ -464,9 +424,16 @@ local-app/
 
 **Goal**: Complete journey lifecycle
 
+- [ ] Implement journey status transitions:
+  ```
+  Planning → In Progress → Ready → Deployed
+  (with ability to move backwards)
+  ```
+
 - [ ] Implement journey actions:
-  - "Mark as In Progress" - status change
+  - "Start Journey" - creates worktree, changes to in_progress
   - "Mark as Ready" - status change
+  - "Mark as Deployed" - status change
   - "Push Branch" - git push with feedback
   - "Create PR" - opens GitHub PR URL in browser
   - "Open in Browser" - opens localhost with correct ports
@@ -474,12 +441,6 @@ local-app/
 - [ ] Add context menu to journey cards:
   - Right-click for full action list
   - Quick actions visible on card
-
-- [ ] Implement status transitions:
-  ```
-  Planning → In Progress → Ready → Deployed
-  (with ability to move backwards)
-  ```
 
 - [ ] Add keyboard shortcuts:
   - `Cmd+N` - New journey
@@ -526,7 +487,7 @@ local-app/
   - Git operation failures (nice error messages)
   - Port conflicts (suggest alternatives)
   - Process spawn failures
-  - Database errors
+  - Supabase connection errors
 
 - [ ] Add app menu (macOS menu bar):
   - File > New Project, New Journey
@@ -546,37 +507,39 @@ local-app/
 
 **Goal**: Web interface for remote access
 
-- [ ] Create `/web-app` with Next.js
-- [ ] Set up Supabase project
-- [ ] Mirror data model to Supabase:
-  - projects table
-  - journeys table
-  - Add user_id for multi-tenancy
+Since we're using Supabase, the web app is simpler:
 
+- [ ] Create `/web-app` with Next.js or Vite + React
+- [ ] Use same Supabase client configuration
 - [ ] Implement web UI:
   - Project list
   - Journey board
-  - Status views
+  - Status views (read-only for system operations)
 
-- [ ] Add local app ↔ web app bridge:
+- [ ] Add local app ↔ web app bridge (for system operations):
   - Local app exposes WebSocket server
   - Web app connects to send commands
-  - Commands: start servers, open Claude, etc.
+  - Commands: start servers, open Claude, create worktree
+
+- [ ] Consider adding Supabase Auth if multi-user needed
 
 ---
 
 ## Quick Start Commands
 
-After Phase 1, from `/local-app`:
+From `/local-app`:
 
 ```bash
+# Ensure correct Node version
+nvm use
+
 # Development with hot reload
 npm run dev
 
 # Build for production
 npm run build
 
-# Package as macOS app (add electron-builder)
+# Package as macOS app (add electron-builder later)
 npm run package
 ```
 
@@ -584,21 +547,27 @@ npm run package
 
 ## Key Technical Decisions
 
+### Supabase over SQLite
+- Cloud sync from day one
+- Same backend for local and web app
+- Simpler architecture (no IPC for data)
+- Service role key bypasses RLS (simpler for solo use)
+
 ### Monorepo structure
 - Allows shared types between local and web app
 - Clear separation of concerns
 - Independent versioning and deployment
 
-### SQLite for local app
-- Works offline
-- Fast queries
-- Easy migration path to sync with Supabase later
+### Journey lifecycle
+- Journeys start in 'planning' with NULL branch/worktree
+- "Start Journey" creates the worktree and sets branch_name
+- This allows planning without creating branches
 
 ### Port allocation strategy
 - Rails: 4001-4020
 - React: 4201-4220
 - 20 parallel journeys supported
-- Ports tracked in DB, released on journey delete
+- Ports tracked in Supabase, released on journey delete
 
 ---
 
@@ -607,13 +576,14 @@ npm run package
 MVP is complete when you can:
 
 1. Add a project (select monorepo folder)
-2. Create a journey (auto-creates git worktree)
-3. Open journey in Claude Code (correct directory)
-4. Start Rails + React dev servers
-5. See server status indicators in dashboard
-6. Open running app in browser
-7. Stop servers
-8. Delete journey (cleans up worktree)
+2. Create a journey (in planning state)
+3. Start a journey (creates git worktree)
+4. Open journey in Claude Code (correct directory)
+5. Start Rails + React dev servers
+6. See server status indicators in dashboard
+7. Open running app in browser
+8. Stop servers
+9. Delete journey (cleans up worktree)
 
 This delivers the core value: **parallel development with isolated environments**.
 
@@ -627,17 +597,19 @@ This delivers the core value: **parallel development with isolated environments*
 | Git worktree edge cases | Thorough status checks before operations |
 | Zombie processes | Track PIDs, cleanup on quit, periodic health check |
 | Port exhaustion | Availability check, user override option |
-| Database corruption | WAL mode, regular backups, migration system |
+| Supabase connection issues | Show offline indicator, retry logic |
+| Service role key exposure | Keep in .env (gitignored), consider auth later |
 
 ---
 
-## Next Steps
+## Completed Commits
 
-1. **Phase 0**: Create folder structure
-2. **Phase 1**: Scaffold Electron app in `/local-app`
-3. Work through phases sequentially, validating each
-4. Use the app daily as you build it (dogfooding)
+1. `163c2d7` - Add detailed implementation plan
+2. `967887b` - Add Electron + React scaffold (Phase 0 & 1)
+3. `9a1c57a` - Add draggable title bar
+4. `9455d6b` - Add Supabase data layer (Phase 2)
 
 ---
 
 *Document created: December 2024*
+*Last updated: December 2024 (Phase 2 complete)*
