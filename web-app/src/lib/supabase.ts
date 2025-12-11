@@ -1,11 +1,3 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables. Check your .env file.');
-}
-
-// Using anon key for web app - respects RLS policies
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Re-export from shared package
+// Note: Supabase is initialized in main.tsx using initSupabase()
+export { getSupabase, initSupabase, createSupabaseClient } from '@dev-orchestrator/shared';

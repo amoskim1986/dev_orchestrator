@@ -240,47 +240,50 @@ psql -h aws-0-us-west-2.pooler.supabase.com -p 6543 -d postgres -U postgres.bxkx
 
 ---
 
-### Phase 3: Basic UI Shell
+### Phase 3: Basic UI Shell ✅ COMPLETE
 
 **Goal**: Navigation and layout working
 
-- [ ] Install UI dependencies
-  ```bash
-  npm install zustand uuid
-  npm install -D @types/uuid
-  ```
+- [x] Install UI dependencies (zustand already installed)
 
-- [ ] Create layout components:
-  - `Sidebar.tsx` - project list navigation
-  - `Header.tsx` - current project name, global actions
-  - `MainLayout.tsx` - combines sidebar + content area
+- [x] Create layout components:
+  - `Layout.tsx` - combines sidebar + content area
+  - `Sidebar.tsx` - tab navigation (Dashboard, History, Projects, Journeys)
+  - `TitleBar.tsx` - draggable title bar
 
-- [ ] Create project components:
-  - `ProjectList.tsx` - list all projects in sidebar
-  - `ProjectCard.tsx` - single project item
+- [x] Create project components:
+  - `ProjectsTab.tsx` - main projects view
+  - `ProjectCard.tsx` - single project item with delete
   - `AddProjectModal.tsx` - folder picker + project setup
 
-- [ ] Create journey components:
+- [x] Create journey components:
+  - `JourneysTab.tsx` - main journeys view
   - `JourneyBoard.tsx` - kanban-style columns by status
   - `JourneyCard.tsx` - single journey card with actions
   - `StatusBadge.tsx` - colored status indicator
   - `AddJourneyModal.tsx` - create journey form
 
-- [ ] Create common components:
-  - `Button.tsx` - styled button variants
-  - `Modal.tsx` - modal wrapper
-  - `Input.tsx` - styled input
+- [x] Create common components:
+  - `Button.tsx` - styled button variants (primary, secondary, danger, ghost)
+  - `Modal.tsx` - modal wrapper with escape key handling
+  - `Input.tsx` - styled input with label and error support
 
-- [ ] Wire up data:
+- [x] Wire up data:
   - Use `useProjects()` hook to load projects
   - Use `useJourneys(projectId)` hook to load journeys
   - Handle loading and error states
 
-- [ ] Style with Tailwind (dark theme for dev tool aesthetic)
+- [x] Style with Tailwind (dark theme)
 
-**Note**: No Zustand stores needed - the Supabase hooks already manage state!
+- [x] Add dialog IPC for folder selection
 
-**Validation**: Can view projects in sidebar, see journey board, UI is navigable
+**Key files created**:
+- `src/components/common/` - Button, Modal, Input
+- `src/components/projects/` - ProjectsTab, ProjectCard, AddProjectModal
+- `src/components/journeys/` - JourneysTab, JourneyBoard, JourneyCard, StatusBadge, AddJourneyModal
+- `electron/ipc/dialog.ipc.ts` - Folder selection dialog
+
+**Validation**: Can view projects, create/delete projects, see kanban journey board, create journeys
 
 ---
 
@@ -612,4 +615,4 @@ This delivers the core value: **parallel development with isolated environments*
 ---
 
 *Document created: December 2024*
-*Last updated: December 2024 (Phase 2 complete)*
+*Last updated: December 2024 (Phase 3 complete)*

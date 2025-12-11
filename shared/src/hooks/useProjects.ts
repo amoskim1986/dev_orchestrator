@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
+import { getSupabase } from '../lib/supabase';
 import type { Project, ProjectInsert, ProjectUpdate } from '../types';
 
 export function useProjects() {
@@ -11,7 +11,7 @@ export function useProjects() {
     setLoading(true);
     setError(null);
 
-    const { data, error: fetchError } = await supabase
+    const { data, error: fetchError } = await getSupabase()
       .from('projects')
       .select('*')
       .order('created_at', { ascending: false });
@@ -25,7 +25,7 @@ export function useProjects() {
   }, []);
 
   const createProject = useCallback(async (project: ProjectInsert): Promise<Project> => {
-    const { data, error: createError } = await supabase
+    const { data, error: createError } = await getSupabase()
       .from('projects')
       .insert(project)
       .select()
@@ -39,7 +39,7 @@ export function useProjects() {
   }, []);
 
   const updateProject = useCallback(async (id: string, updates: ProjectUpdate): Promise<Project> => {
-    const { data, error: updateError } = await supabase
+    const { data, error: updateError } = await getSupabase()
       .from('projects')
       .update(updates)
       .eq('id', id)
@@ -54,7 +54,7 @@ export function useProjects() {
   }, []);
 
   const deleteProject = useCallback(async (id: string): Promise<void> => {
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await getSupabase()
       .from('projects')
       .delete()
       .eq('id', id);

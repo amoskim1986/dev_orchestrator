@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useProjects } from '../../hooks/useProjects'
+import { useProjects } from '../../hooks'
 import { ProjectCard } from './ProjectCard'
 import { AddProjectModal } from './AddProjectModal'
 import { Button } from '../common/Button'

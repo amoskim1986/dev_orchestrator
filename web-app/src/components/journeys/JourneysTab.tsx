@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { useJourneys } from '../../hooks/useJourneys'
-import { useProjects } from '../../hooks/useProjects'
+import { useJourneys, useProjects } from '../../hooks'
 import { JourneyBoard } from './JourneyBoard'
 import { AddJourneyModal } from './AddJourneyModal'
 import { Button } from '../common/Button'

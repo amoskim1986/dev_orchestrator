@@ -1,5 +1,4 @@
-import { useProjects } from '../../hooks/useProjects'
-import { useJourneys } from '../../hooks/useJourneys'
+import { useProjects, useJourneys } from '../../hooks'
 import { StatusBadge } from '../journeys/StatusBadge'
 
 export function Dashboard() {

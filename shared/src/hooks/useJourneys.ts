@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
+import { getSupabase } from '../lib/supabase';
 import type { Journey, JourneyInsert, JourneyUpdate } from '../types';
 
 export function useJourneys(projectId?: string) {
@@ -11,7 +11,7 @@ export function useJourneys(projectId?: string) {
     setLoading(true);
     setError(null);
 
-    let query = supabase
+    let query = getSupabase()
       .from('journeys')
       .select('*')
       .order('created_at', { ascending: false });
@@ -31,7 +31,7 @@ export function useJourneys(projectId?: string) {
   }, [projectId]);
 
   const createJourney = useCallback(async (journey: JourneyInsert): Promise<Journey> => {
-    const { data, error: createError } = await supabase
+    const { data, error: createError } = await getSupabase()
       .from('journeys')
       .insert(journey)
       .select()
@@ -45,7 +45,7 @@ export function useJourneys(projectId?: string) {
   }, []);
 
   const updateJourney = useCallback(async (id: string, updates: JourneyUpdate): Promise<Journey> => {
-    const { data, error: updateError } = await supabase
+    const { data, error: updateError } = await getSupabase()
       .from('journeys')
       .update(updates)
       .eq('id', id)
@@ -60,7 +60,7 @@ export function useJourneys(projectId?: string) {
   }, []);
 
   const deleteJourney = useCallback(async (id: string): Promise<void> => {
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await getSupabase()
       .from('journeys')
       .delete()
       .eq('id', id);

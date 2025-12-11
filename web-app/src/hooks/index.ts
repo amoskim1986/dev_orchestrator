@@ -1,2 +1,2 @@
-export { useProjects } from './useProjects';
-export { useJourneys } from './useJourneys';
+// Re-export shared hooks
+export { useProjects, useJourneys } from '@dev-orchestrator/shared';

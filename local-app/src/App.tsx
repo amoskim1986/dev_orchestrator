@@ -1,5 +1,7 @@
 import { Layout } from './components/layout/Layout'
 import { HistoryTab } from './components/history/HistoryTab'
+import { ProjectsTab } from './components/projects'
+import { JourneysTab } from './components/journeys'
 
 function App() {
   return (
@@ -21,17 +23,9 @@ function App() {
               </div>
             )
           case 'projects':
-            return (
-              <div className="flex-1 flex items-center justify-center text-gray-500">
-                Projects tab coming soon...
-              </div>
-            )
+            return <ProjectsTab />
           case 'journeys':
-            return (
-              <div className="flex-1 flex items-center justify-center text-gray-500">
-                Journeys tab coming soon...
-              </div>
-            )
+            return <JourneysTab />
           default:
             return null
         }

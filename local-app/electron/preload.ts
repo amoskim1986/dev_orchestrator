@@ -27,6 +27,56 @@ interface ClaudeMessage {
   model?: string
 }
 
+// Claude CLI service types
+interface ClaudeCliRequest {
+  prompt: string
+  jsonSchema?: string
+  workingDirectory?: string
+  timeout?: number
+  priority?: number
+}
+
+interface ClaudeCliResponse<T = unknown> {
+  success: boolean
+  data?: T
+  rawOutput?: string
+  error?: string
+  durationMs: number
+}
+
+interface JourneyAnalysis {
+  title: string
+  complexity: 1 | 2 | 3 | 4 | 5
+  estimatedTasks: number
+  keyTasks: string[]
+  suggestedBranchName: string
+  risks: string[]
+  dependencies: string[]
+}
+
+interface ImplementationPlan {
+  featureName: string
+  estimatedComplexity: 'low' | 'medium' | 'high'
+  steps: {
+    order: number
+    title: string
+    description: string
+    filesToCreate: string[]
+    filesToModify: string[]
+  }[]
+  risks: string[]
+  dependencies: string[]
+}
+
+interface JourneySummary {
+  summary: string
+  status: 'on_track' | 'at_risk' | 'blocked'
+  completedItems: string[]
+  remainingItems: string[]
+  blockers: string[]
+  nextSteps: string[]
+}
+
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -47,6 +97,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
     close: (windowId: string) => ipcRenderer.invoke('terminal:close', windowId),
     inject: (windowId: string, text: string) => ipcRenderer.invoke('terminal:inject', windowId, text),
   },
+
+  // Dialog API
+  dialog: {
+    openFolder: () => ipcRenderer.invoke('dialog:openFolder'),
+  },
+
+  // Claude CLI API - AI-powered features using Claude Max subscription
+  claude: {
+    query: (request: ClaudeCliRequest) => ipcRenderer.invoke('claude:query', request),
+    queryJson: <T>(prompt: string, jsonSchema: string, options?: Partial<ClaudeCliRequest>) =>
+      ipcRenderer.invoke('claude:queryJson', { prompt, jsonSchema, options }) as Promise<ClaudeCliResponse<T>>,
+    analyzeJourney: (description: string, projectContext?: string) =>
+      ipcRenderer.invoke('claude:analyzeJourney', { description, projectContext }) as Promise<ClaudeCliResponse<JourneyAnalysis>>,
+    createPlan: (featureDescription: string, techStack: string, existingStructure?: string) =>
+      ipcRenderer.invoke('claude:createPlan', { featureDescription, techStack, existingStructure }) as Promise<ClaudeCliResponse<ImplementationPlan>>,
+    summarizeJourney: (journeyName: string, gitDiff: string, commitHistory: string, originalPlan?: string) =>
+      ipcRenderer.invoke('claude:summarizeJourney', { journeyName, gitDiff, commitHistory, originalPlan }) as Promise<ClaudeCliResponse<JourneySummary>>,
+    getStatus: () => ipcRenderer.invoke('claude:getStatus') as Promise<{ queueLength: number; activeRequests: number }>,
+    clearQueue: () => ipcRenderer.invoke('claude:clearQueue') as Promise<number>,
+  },
 })
 
 // Type definitions for the exposed API
@@ -63,6 +133,18 @@ declare global {
         open: (options: { cwd: string; title?: string; launchClaude?: boolean; sessionId?: string; initialPrompt?: string }) => Promise<string>
         close: (windowId: string) => Promise<void>
         inject: (windowId: string, text: string) => Promise<void>
+      }
+      dialog: {
+        openFolder: () => Promise<string | null>
+      }
+      claude: {
+        query: (request: ClaudeCliRequest) => Promise<ClaudeCliResponse>
+        queryJson: <T>(prompt: string, jsonSchema: string, options?: Partial<ClaudeCliRequest>) => Promise<ClaudeCliResponse<T>>
+        analyzeJourney: (description: string, projectContext?: string) => Promise<ClaudeCliResponse<JourneyAnalysis>>
+        createPlan: (featureDescription: string, techStack: string, existingStructure?: string) => Promise<ClaudeCliResponse<ImplementationPlan>>
+        summarizeJourney: (journeyName: string, gitDiff: string, commitHistory: string, originalPlan?: string) => Promise<ClaudeCliResponse<JourneySummary>>
+        getStatus: () => Promise<{ queueLength: number; activeRequests: number }>
+        clearQueue: () => Promise<number>
       }
     }
   }
