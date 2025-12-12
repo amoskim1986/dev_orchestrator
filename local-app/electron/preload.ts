@@ -150,6 +150,51 @@ interface Plan {
 }
 
 type JourneyType = 'feature_planning' | 'feature' | 'bug' | 'investigation'
+type JourneyStage = string // Simplified for preload
+
+// VS Code Launcher types
+interface VSCodeLaunchOptions {
+  workingDirectory: string
+  initialPrompt?: string
+  chatMode?: 'agent' | 'ask' | 'edit'
+  contextFiles?: string[]
+  maximizeChat?: boolean
+  newWindow?: boolean
+}
+
+interface VSCodeLaunchResult {
+  success: boolean
+  vscodePid?: number
+  error?: string
+  workspaceIdentifier: string
+}
+
+interface VSCodeStatus {
+  installed: boolean
+  executablePath: string | null
+  version: string | null
+}
+
+interface JourneyLaunchRequest {
+  journeyId: string
+  journeyName: string
+  journeyType: JourneyType
+  journeyStage: JourneyStage
+  worktreePath: string
+  projectRootPath: string
+  customPrompt?: string
+}
+
+// Project intake types
+interface ProjectIntakeRefinement {
+  document: string
+}
+
+interface ProjectIntakeUpdate {
+  changes_summary: string
+  suggested_updates: string
+  updated_document: string
+}
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -199,6 +244,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('claude:summarizeJourney', { journeyName, gitDiff, commitHistory, originalPlan }) as Promise<ClaudeCliResponse<JourneySummary>>,
     getStatus: () => ipcRenderer.invoke('claude:getStatus') as Promise<{ queueLength: number; activeRequests: number }>,
     clearQueue: () => ipcRenderer.invoke('claude:clearQueue') as Promise<number>,
+    // Project intake methods
+    refineProjectIntake: (rawIntake: string, projectName: string) =>
+      ipcRenderer.invoke('claude:refineProjectIntake', { rawIntake, projectName }) as Promise<ClaudeCliResponse<ProjectIntakeRefinement>>,
+    analyzeProjectIntakeChanges: (previousRaw: string, newRaw: string, existingAiDoc: string, projectName: string) =>
+      ipcRenderer.invoke('claude:analyzeProjectIntakeChanges', { previousRaw, newRaw, existingAiDoc, projectName }) as Promise<ClaudeCliResponse<ProjectIntakeUpdate>>,
+  },
+
+  // VS Code Launcher API - Opens VS Code with Claude Code
+  vscode: {
+    getStatus: () => ipcRenderer.invoke('vscode:getStatus') as Promise<VSCodeStatus>,
+    launch: (options: VSCodeLaunchOptions) =>
+      ipcRenderer.invoke('vscode:launch', options) as Promise<VSCodeLaunchResult>,
+    launchForJourney: (request: JourneyLaunchRequest) =>
+      ipcRenderer.invoke('vscode:launchForJourney', request) as Promise<VSCodeLaunchResult>,
+    generatePrompt: (
+      type: 'default' | 'resume' | 'review' | 'testing',
+      context: JourneyLaunchRequest,
+      lastActivity?: string
+    ) =>
+      ipcRenderer.invoke('vscode:generatePrompt', { type, context, lastActivity }) as Promise<string>,
   },
 })
 
@@ -234,6 +299,19 @@ declare global {
         summarizeJourney: (journeyName: string, gitDiff: string, commitHistory: string, originalPlan?: string) => Promise<ClaudeCliResponse<JourneySummary>>
         getStatus: () => Promise<{ queueLength: number; activeRequests: number }>
         clearQueue: () => Promise<number>
+        // Project intake methods
+        refineProjectIntake: (rawIntake: string, projectName: string) => Promise<ClaudeCliResponse<ProjectIntakeRefinement>>
+        analyzeProjectIntakeChanges: (previousRaw: string, newRaw: string, existingAiDoc: string, projectName: string) => Promise<ClaudeCliResponse<ProjectIntakeUpdate>>
+      }
+      vscode: {
+        getStatus: () => Promise<VSCodeStatus>
+        launch: (options: VSCodeLaunchOptions) => Promise<VSCodeLaunchResult>
+        launchForJourney: (request: JourneyLaunchRequest) => Promise<VSCodeLaunchResult>
+        generatePrompt: (
+          type: 'default' | 'resume' | 'review' | 'testing',
+          context: JourneyLaunchRequest,
+          lastActivity?: string
+        ) => Promise<string>
       }
     }
   }

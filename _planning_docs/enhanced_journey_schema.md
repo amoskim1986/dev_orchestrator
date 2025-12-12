@@ -2,7 +2,7 @@
 
 > **Status**: Partially Implemented
 > **Created**: 2024-12-12
-> **Last Updated**: 2024-12-12
+> **Last Updated**: 2024-12-12 (Project intake AI feature + Project tabs in Journeys)
 > **Scope**: Database schema expansion, TypeScript types, React hooks, UI components
 
 ---
@@ -17,6 +17,80 @@ This document outlines the expanded database schema to support:
 4. **Multi-Target Projects** (rails, web, electron, mobile, chrome extension, etc.)
 5. **Session Tracking** with multiple AI tools (Claude Code, Cursor, Copilot, etc.)
 6. **Parallelization Support** for concurrent journey execution
+7. **Project Intake AI Refinement** with diff-based updates
+
+---
+
+## Recently Completed Features
+
+### Project Intake AI Refinement ✅ (December 2024)
+
+Added ability to capture raw intake text for projects, process through Claude AI, and manage both versions.
+
+**Database Schema** (`003_project_intake.sql`):
+```sql
+ALTER TABLE projects
+ADD COLUMN raw_intake TEXT,
+ADD COLUMN raw_intake_previous TEXT,        -- for diff comparison
+ADD COLUMN ai_parsed_intake TEXT,
+ADD COLUMN ai_parsed_at TIMESTAMPTZ,        -- when AI generation happened
+ADD COLUMN intake_updated_at TIMESTAMPTZ;
+```
+
+**AI Prompts** (`local-app/electron/services/claude-cli/prompts.ts`):
+- `buildProjectIntakeRefinementPrompt()` - Initial AI refinement
+  - Sections in order: Overview → Goals → Features → Constraints → Tech Requirements → Architecture
+  - Only includes sections with explicit content (no fabrication)
+- `buildProjectIntakeUpdatePrompt()` - Diff-based update suggestions
+  - Compares old vs new raw content
+  - Returns changes summary + updated AI document
+
+**IPC Handlers** (`local-app/electron/ipc/claude-cli.ipc.ts`):
+- `claude:refineProjectIntake` - Initial generation
+- `claude:analyzeProjectIntakeChanges` - Diff analysis and update
+
+**UI Components**:
+
+| Component | App | Purpose |
+|-----------|-----|---------|
+| `ProjectIntakeEditor` | Local | Tabbed interface (Raw/AI), AI generation, explicit save |
+| `ProjectIntakeEditor` | Web | Simpler version, no AI generation, debounced auto-save |
+| `IntakeChangesDialog` | Local | Shows diff when saving raw changes, prompts for AI update |
+| `ProjectDetailModal` | Local | Full project detail view with intake editor |
+| `ProjectDetailPanel` | Web | Side panel view with intake editor |
+| `ProjectCard` | Both | Updated with intake status indicator (green=AI, yellow=raw) |
+
+**Flow**:
+1. User types/pastes raw intake in "Raw Intake" tab
+2. User clicks "Save"
+3. If no AI doc exists → prompt to generate
+4. If AI doc exists and raw changed → AI compares versions, shows diff dialog
+5. User chooses: "Update AI Doc" / "Keep Current" / "Cancel"
+
+### Project Tabs in Journeys View ✅ (December 2024)
+
+Changed Journeys tab to show projects as tabs at the top for easy switching (both apps).
+
+**Before**: Separate project selection screen
+**After**: Project tabs at top → Journey type tabs below → Journey cards
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Project: [Project A] [Project B] [Project C]                   │  ← Project tabs
+├─────────────────────────────────────────────────────────────────┤
+│  [📋 Planning] [✨ Feature] [🐛 Bug] [🔍 Investigation]         │  ← Journey type tabs
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Journey cards...                                               │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Implementation**:
+- Changed from `selectedProject` state to `selectedProjectId` with auto-select first project
+- Added project tabs at top with horizontal scroll for many projects
+- Journey type tabs moved below project tabs
+- Inline loading/error states for journeys
 
 ---
 
@@ -35,7 +109,7 @@ The journey detail panel should have **tabs** for different aspects of a journey
 │  Tab content here...                                            │
 │                                                                 │
 ├─────────────────────────────────────────────────────────────────┤
-│  [← Previous Stage]  [Next Stage →]  [Open Claude Code]        │
+│  [← Previous Stage]  [Next Stage →]  [VS Code]  [Terminal]     │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -66,6 +140,8 @@ What's done:
 - Detail panel with edit capability
 - Stage forward/backward navigation
 - Quick intake form per type tab
+- **Project tabs** at top of Journeys view for easy switching between projects
+- **Project intake AI refinement** with tabbed Raw/AI view and diff-based updates
 
 ---
 
@@ -996,14 +1072,61 @@ const createIntake = async (rawContent: string) => {
 - [x] Add plan generation prompt (`buildPlanGenerationPrompt`)
 - [x] IPC handlers for all AI operations
 - [x] Preload API exposure for renderer
+- [x] **Project intake AI refinement** (`buildProjectIntakeRefinementPrompt`, `buildProjectIntakeUpdatePrompt`)
+- [x] Project intake IPC handlers (`claude:refineProjectIntake`, `claude:analyzeProjectIntakeChanges`)
+- [x] Project intake UI (ProjectIntakeEditor, IntakeChangesDialog, ProjectDetailModal)
 
 **Pending:**
-- [ ] Wire up AI refinement in intake editor UI
+- [ ] Wire up AI refinement in journey intake editor UI
 - [ ] Wire up spec generation in spec tab UI
 - [ ] Wire up plan generation in plan tab UI
 - [ ] Add loading states/spinners for AI operations
 - [ ] Add error handling UI for failed AI calls
 - [ ] Streaming response support (show AI output as it generates)
+
+### Phase 5b: Project Intake Feature ✅ COMPLETE
+**Database:**
+- [x] Migration `003_project_intake.sql`
+- [x] Add `raw_intake`, `raw_intake_previous`, `ai_parsed_intake`, `ai_parsed_at`, `intake_updated_at` columns
+
+**Types:**
+- [x] Update Project interface in `shared/src/types/index.ts`
+- [x] Update ProjectInsert and ProjectUpdate types
+
+**AI Prompts:**
+- [x] `buildProjectIntakeRefinementPrompt()` - sections: Overview → Goals → Features → Constraints → Tech → Architecture
+- [x] `buildProjectIntakeUpdatePrompt()` - diff analysis with changes summary
+
+**IPC:**
+- [x] `claude:refineProjectIntake` handler
+- [x] `claude:analyzeProjectIntakeChanges` handler
+- [x] Update preload.ts with new API methods
+
+**Hooks:**
+- [x] Add `refineProjectIntake()` and `analyzeProjectIntakeChanges()` to claudeCliStore
+- [x] Add `useProjectIntakeAI()` hook in useClaudeCli.ts
+
+**Local App UI:**
+- [x] `ProjectIntakeEditor.tsx` - tabbed Raw/AI interface with AI generation
+- [x] `IntakeChangesDialog.tsx` - diff dialog for update decisions
+- [x] `ProjectDetailModal.tsx` - full project detail view
+- [x] Update `ProjectCard.tsx` - add onSelect and intake status indicator
+- [x] Update `ProjectsTab.tsx` - integrate ProjectDetailModal
+
+**Web App UI:**
+- [x] `ProjectIntakeEditor.tsx` - simpler version (no AI)
+- [x] `ProjectDetailPanel.tsx` - side panel view
+- [x] Update `ProjectCard.tsx` - add intake status indicator
+- [x] Update `ProjectsTab.tsx` - split view with detail panel
+
+### Phase 5c: Project Tabs in Journeys ✅ COMPLETE
+- [x] Update `local-app/src/components/journeys/JourneysTab.tsx`
+  - [x] Change to `selectedProjectId` state with auto-select first project
+  - [x] Add project tabs at top of view
+  - [x] Move journey type tabs below project tabs
+  - [x] Add horizontal scroll for many projects
+- [x] Update `web-app/src/components/journeys/JourneysTab.tsx`
+  - [x] Same changes as local-app version
 
 ### Phase 6: Session & Process Management (Future)
 - [ ] Start/stop dev server processes per target
@@ -1042,7 +1165,49 @@ The Claude CLI wrapper service (already built) provides:
 - `createPlan(featureDescription, techStack, existingStructure)` → ImplementationPlan
 - `summarizeJourney(journeyName, gitDiff, commitHistory, originalPlan)` → JourneySummary
 - `queryJson<T>(prompt, jsonSchema)` → Structured JSON responses
+- `refineIntake(rawIntake, journeyType, projectContext)` → RefinedIntake
+- `generateSpec(refinedIntake, projectContext, techStack)` → Spec
+- `generatePlan(spec, projectContext)` → Plan
 
 Location: `local-app/electron/services/claude-cli/`
 
 This service turns your Claude Max subscription into a local API for AI-powered features.
+
+---
+
+## Appendix: VS Code + Claude Code Launcher Service
+
+✅ **Implemented December 2024**
+
+Opens VS Code at a journey's worktree and automatically sends a contextual prompt to Claude Code using VS Code's `code chat` CLI command.
+
+### Key Discovery
+VS Code has a built-in chat command:
+```bash
+code chat "Your prompt" --mode agent --reuse-window
+```
+
+### API
+- `vscode.getStatus()` → Check if VS Code is installed
+- `vscode.launch(options)` → Open VS Code with optional Claude prompt
+- `vscode.launchForJourney(request)` → Open VS Code with contextual prompt based on journey type/stage
+- `vscode.generatePrompt(type, context)` → Generate prompt without launching
+
+### Contextual Prompts
+Prompts are generated based on journey type and stage:
+- **feature_planning**: Spec/planning prompts (intake, speccing, planning, review, approved)
+- **feature**: Implementation prompts (implementing, testing, pre_prod_review, etc.)
+- **bug**: Investigation and fix prompts (reported, investigating, fixing)
+- **investigation**: Research prompts (in_progress, complete)
+
+### Flow
+1. User clicks "VS Code" button on a started journey
+2. Service detects VS Code installation path
+3. Opens VS Code in a new window at the worktree path
+4. After 2s delay, sends `code chat "<prompt>" --mode agent --reuse-window`
+5. Claude Code opens with the contextual prompt
+
+### Location
+- Service: `local-app/electron/services/vscode-launcher/`
+- IPC: `local-app/electron/ipc/vscode-launcher.ipc.ts`
+- UI: "VS Code" button on JourneyCard (only shown for started journeys)

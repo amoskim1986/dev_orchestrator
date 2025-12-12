@@ -2,15 +2,35 @@ import type { Project } from '../../types'
 
 interface ProjectCardProps {
   project: Project
+  onSelect: () => void
   onDelete: () => void
 }
 
-export function ProjectCard({ project, onDelete }: ProjectCardProps) {
+export function ProjectCard({ project, onSelect, onDelete }: ProjectCardProps) {
+  // Determine intake status
+  const intakeStatus = project.ai_parsed_at
+    ? 'ai'
+    : project.raw_intake
+      ? 'raw'
+      : 'none'
+
   return (
-    <div className="p-3 rounded-lg bg-gray-800 border border-gray-700 hover:border-gray-600 transition-colors">
+    <div
+      onClick={onSelect}
+      className="p-3 rounded-lg bg-gray-800 border border-gray-700 hover:border-blue-500 hover:bg-gray-750 transition-colors cursor-pointer"
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-white truncate">{project.name}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-medium text-white truncate">{project.name}</h3>
+            {/* Intake status indicator */}
+            {intakeStatus === 'ai' && (
+              <span className="flex-shrink-0 w-2 h-2 rounded-full bg-green-400" title="AI-refined intake" />
+            )}
+            {intakeStatus === 'raw' && (
+              <span className="flex-shrink-0 w-2 h-2 rounded-full bg-yellow-400" title="Raw intake only" />
+            )}
+          </div>
           <p className="text-xs text-gray-400 truncate mt-1" title={project.root_path}>
             {project.root_path}
           </p>

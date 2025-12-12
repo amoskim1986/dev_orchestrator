@@ -47,6 +47,8 @@ export function useClaudeCli() {
     lastAnalysis: store.lastAnalysis,
     lastPlan: store.lastPlan,
     lastSummary: store.lastSummary,
+    lastProjectIntakeRefinement: store.lastProjectIntakeRefinement,
+    lastProjectIntakeUpdate: store.lastProjectIntakeUpdate,
 
     // Actions
     analyzeJourney: store.analyzeJourney,
@@ -54,6 +56,9 @@ export function useClaudeCli() {
     summarizeJourney: store.summarizeJourney,
     queryRaw: store.queryRaw,
     queryJson: store.queryJson,
+    // Project intake actions
+    refineProjectIntake: store.refineProjectIntake,
+    analyzeProjectIntakeChanges: store.analyzeProjectIntakeChanges,
     clearQueue: store.clearQueue,
     clearError: store.clearError,
     refreshStatus: store.refreshStatus,
@@ -123,6 +128,47 @@ export function useJourneySummary() {
     summarize,
     isSummarizing: isProcessing,
     summary: lastSummary,
+    error: lastError,
+    durationMs: lastDurationMs,
+    clearError,
+  }
+}
+
+/**
+ * Hook for project intake AI refinement
+ */
+export function useProjectIntakeAI() {
+  const {
+    refineProjectIntake,
+    analyzeProjectIntakeChanges,
+    isProcessing,
+    lastProjectIntakeRefinement,
+    lastProjectIntakeUpdate,
+    lastError,
+    lastDurationMs,
+    clearError,
+  } = useClaudeCli()
+
+  const refine = useCallback(
+    async (rawIntake: string, projectName: string) => {
+      return refineProjectIntake(rawIntake, projectName)
+    },
+    [refineProjectIntake]
+  )
+
+  const analyzeChanges = useCallback(
+    async (previousRaw: string, newRaw: string, existingAiDoc: string, projectName: string) => {
+      return analyzeProjectIntakeChanges(previousRaw, newRaw, existingAiDoc, projectName)
+    },
+    [analyzeProjectIntakeChanges]
+  )
+
+  return {
+    refine,
+    analyzeChanges,
+    isProcessing,
+    refinement: lastProjectIntakeRefinement,
+    update: lastProjectIntakeUpdate,
     error: lastError,
     durationMs: lastDurationMs,
     clearError,

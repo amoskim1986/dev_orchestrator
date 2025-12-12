@@ -2,12 +2,15 @@ import { useState } from 'react'
 import { useProjects } from '../../hooks/useProjects'
 import { ProjectCard } from './ProjectCard'
 import { AddProjectModal } from './AddProjectModal'
+import { ProjectDetailModal } from './ProjectDetailModal'
 import { Button } from '../common/Button'
+import type { Project } from '@dev-orchestrator/shared'
 
 export function ProjectsTab() {
   const { projects, loading, error, createProject, deleteProject } = useProjects()
   const [showAddModal, setShowAddModal] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
 
   const handleDelete = async (id: string) => {
     try {
@@ -64,6 +67,7 @@ export function ProjectsTab() {
               <div key={project.id}>
                 <ProjectCard
                   project={project}
+                  onSelect={() => setSelectedProject(project)}
                   onDelete={() => setDeleteConfirm(project.id)}
                 />
 
@@ -102,6 +106,13 @@ export function ProjectsTab() {
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         onSubmit={createProject}
+      />
+
+      {/* Project Detail Modal */}
+      <ProjectDetailModal
+        project={selectedProject}
+        isOpen={!!selectedProject}
+        onClose={() => setSelectedProject(null)}
       />
     </div>
   )

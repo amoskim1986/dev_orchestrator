@@ -55,6 +55,11 @@ export interface Project {
   backend_path: string | null;
   frontend_start_cmd: string;
   backend_start_cmd: string;
+  raw_intake: string | null;
+  raw_intake_previous: string | null;
+  ai_parsed_intake: string | null;
+  ai_parsed_at: string | null;
+  intake_updated_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -185,6 +190,11 @@ export type ProjectInsert = Omit<Project, 'id' | 'created_at' | 'updated_at'> & 
   backend_path?: string | null;
   frontend_start_cmd?: string;
   backend_start_cmd?: string;
+  raw_intake?: string | null;
+  raw_intake_previous?: string | null;
+  ai_parsed_intake?: string | null;
+  ai_parsed_at?: string | null;
+  intake_updated_at?: string | null;
 };
 
 export type ProjectTargetInsert = {

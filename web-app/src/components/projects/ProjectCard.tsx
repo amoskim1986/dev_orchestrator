@@ -8,6 +8,13 @@ interface ProjectCardProps {
 }
 
 export function ProjectCard({ project, isSelected, onSelect, onDelete }: ProjectCardProps) {
+  // Determine intake status
+  const intakeStatus = project.ai_parsed_at
+    ? 'ai'
+    : project.raw_intake
+      ? 'raw'
+      : 'none'
+
   return (
     <div
       onClick={onSelect}
@@ -21,7 +28,16 @@ export function ProjectCard({ project, isSelected, onSelect, onDelete }: Project
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-white truncate">{project.name}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-medium text-white truncate">{project.name}</h3>
+            {/* Intake status indicator */}
+            {intakeStatus === 'ai' && (
+              <span className="flex-shrink-0 w-2 h-2 rounded-full bg-green-400" title="AI-refined intake" />
+            )}
+            {intakeStatus === 'raw' && (
+              <span className="flex-shrink-0 w-2 h-2 rounded-full bg-yellow-400" title="Raw intake only" />
+            )}
+          </div>
           <p className="text-xs text-gray-400 truncate mt-1" title={project.root_path}>
             {project.root_path}
           </p>

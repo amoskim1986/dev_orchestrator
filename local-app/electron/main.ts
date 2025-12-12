@@ -3,6 +3,7 @@ import path from 'path'
 import { registerHistoryIpc } from './ipc/history.ipc'
 import { registerDialogIpc } from './ipc/dialog.ipc'
 import { registerClaudeCliIpc } from './ipc/claude-cli.ipc'
+import { registerVSCodeLauncherIpc } from './ipc/vscode-launcher.ipc'
 
 // Set app name for macOS menu bar and dock
 app.name = 'Dev Orchestrator'
@@ -69,6 +70,7 @@ app.whenReady().then(async () => {
   registerHistoryIpc()
   registerDialogIpc()
   registerClaudeCliIpc()
+  registerVSCodeLauncherIpc()
 
   // Dynamically import terminal IPC to avoid app.isPackaged at module load time
   const { registerTerminalIpc } = await import('./ipc/terminal.ipc')

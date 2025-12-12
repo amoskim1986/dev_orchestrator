@@ -97,7 +97,11 @@ function QuickIntakeForm({
 
 export function JourneysTab() {
   const { projects, loading: projectsLoading } = useProjects()
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+
+  // Auto-select first project when projects load
+  const selectedProject = projects.find(p => p.id === selectedProjectId) || projects[0] || null
+
   const { journeys, loading, error, createJourney, updateJourney, deleteJourney } = useJourneys(selectedProject?.id)
   const [activeType, setActiveType] = useState<JourneyType>('feature_planning')
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
@@ -167,58 +171,25 @@ export function JourneysTab() {
     ? journeys.find(j => j.id === selectedJourney.id) || null
     : null
 
-  // Project selector
-  if (!selectedProject) {
+  // Loading state
+  if (projectsLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-gray-400">Loading projects...</div>
+      </div>
+    )
+  }
+
+  // No projects state
+  if (projects.length === 0) {
     return (
       <div className="flex-1 flex flex-col p-4 overflow-hidden">
         <h1 className="text-xl font-semibold text-white mb-4">Journeys</h1>
-
-        {projectsLoading ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-gray-400">Loading projects...</div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-gray-400 mb-2">No projects yet</p>
+            <p className="text-sm text-gray-500">Create a project first to manage journeys</p>
           </div>
-        ) : projects.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <p className="text-gray-400 mb-2">No projects yet</p>
-              <p className="text-sm text-gray-500">Create a project first to manage journeys</p>
-            </div>
-          </div>
-        ) : (
-          <div className="flex-1">
-            <p className="text-gray-400 mb-4">Select a project to view its journeys:</p>
-            <div className="grid gap-2 max-w-md">
-              {projects.map((project) => (
-                <button
-                  key={project.id}
-                  onClick={() => setSelectedProject(project)}
-                  className="text-left p-3 bg-gray-800 border border-gray-700 rounded-lg hover:border-gray-600 transition-colors"
-                >
-                  <div className="font-medium text-white">{project.name}</div>
-                  <div className="text-xs text-gray-500 truncate">{project.root_path}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-gray-400">Loading journeys...</div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-400 mb-2">Failed to load journeys</p>
-          <p className="text-sm text-gray-500">{error.message}</p>
         </div>
       </div>
     )
@@ -228,20 +199,23 @@ export function JourneysTab() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Header with project name */}
-      <div className="flex items-center gap-3 p-4 border-b border-gray-700">
-        <button
-          onClick={() => setSelectedProject(null)}
-          className="text-gray-400 hover:text-white transition-colors"
-          title="Back to project selection"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <div>
-          <h1 className="text-lg font-semibold text-white">{selectedProject.name}</h1>
-          <p className="text-xs text-gray-500">{selectedProject.root_path}</p>
+      {/* Project Tabs */}
+      <div className="flex items-center border-b border-gray-700 bg-gray-900/50">
+        <div className="px-4 py-2 text-sm font-medium text-gray-500">Project:</div>
+        <div className="flex-1 flex overflow-x-auto">
+          {projects.map((project) => (
+            <button
+              key={project.id}
+              onClick={() => setSelectedProjectId(project.id)}
+              className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors border-b-2 ${
+                selectedProject?.id === project.id
+                  ? 'border-blue-500 text-blue-400 bg-gray-800/50'
+                  : 'border-transparent text-gray-400 hover:text-gray-200 hover:bg-gray-800/30'
+              }`}
+            >
+              {project.name}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -278,40 +252,56 @@ export function JourneysTab() {
 
       {/* Content Area */}
       <div className={`flex-1 flex flex-col overflow-hidden p-4 transition-all ${currentSelectedJourney ? 'mr-[480px]' : ''}`}>
-        {/* Type Description */}
-        <p className="text-sm text-gray-400 mb-4">{activeConfig.description}</p>
-
-        {/* Quick Intake Form */}
-        <QuickIntakeForm
-          journeyType={activeType}
-          onSubmit={handleQuickCreate}
-          isSubmitting={isCreating}
-        />
-
-        {/* Journey Cards */}
-        {filteredJourneys.length === 0 ? (
+        {/* Loading/Error states for journeys */}
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-gray-400">Loading journeys...</div>
+          </div>
+        ) : error ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <span className="text-4xl mb-3 block">{activeConfig.icon}</span>
-              <p className="text-gray-400 mb-1">No {activeConfig.label.toLowerCase()} journeys yet</p>
-              <p className="text-sm text-gray-500">Use the form above to create one</p>
+              <p className="text-red-400 mb-2">Failed to load journeys</p>
+              <p className="text-sm text-gray-500">{error.message}</p>
             </div>
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {filteredJourneys.map(journey => (
-                <JourneyCard
-                  key={journey.id}
-                  journey={journey}
-                  onUpdateStage={(stage) => handleUpdateStage(journey.id, stage)}
-                  onStart={() => {/* No-op in web app */}}
-                  onDelete={() => setDeleteConfirm(journey.id)}
-                  onClick={() => setSelectedJourney(journey)}
-                />
-              ))}
-            </div>
-          </div>
+          <>
+            {/* Type Description */}
+            <p className="text-sm text-gray-400 mb-4">{activeConfig.description}</p>
+
+            {/* Quick Intake Form */}
+            <QuickIntakeForm
+              journeyType={activeType}
+              onSubmit={handleQuickCreate}
+              isSubmitting={isCreating}
+            />
+
+            {/* Journey Cards */}
+            {filteredJourneys.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <span className="text-4xl mb-3 block">{activeConfig.icon}</span>
+                  <p className="text-gray-400 mb-1">No {activeConfig.label.toLowerCase()} journeys yet</p>
+                  <p className="text-sm text-gray-500">Use the form above to create one</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {filteredJourneys.map(journey => (
+                    <JourneyCard
+                      key={journey.id}
+                      journey={journey}
+                      onUpdateStage={(stage) => handleUpdateStage(journey.id, stage)}
+                      onStart={() => {/* No-op in web app */}}
+                      onDelete={() => setDeleteConfirm(journey.id)}
+                      onClick={() => setSelectedJourney(journey)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 

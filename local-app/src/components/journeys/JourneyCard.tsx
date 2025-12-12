@@ -10,9 +10,10 @@ interface JourneyCardProps {
   onStart: () => void
   onDelete: () => void
   onClick?: () => void
+  onOpenInVSCode?: () => void
 }
 
-export function JourneyCard({ journey, onUpdateStage, onStart, onDelete, onClick }: JourneyCardProps) {
+export function JourneyCard({ journey, onUpdateStage, onStart, onDelete, onClick, onOpenInVSCode }: JourneyCardProps) {
   const isStarted = journey.branch_name !== null
   const stages = getStagesForType(journey.type)
   const currentStageIndex = stages.indexOf(journey.stage)
@@ -85,6 +86,24 @@ export function JourneyCard({ journey, onUpdateStage, onStart, onDelete, onClick
           {(journey.stage === 'intake' || journey.stage === 'reported') && !isStarted && (
             <Button size="sm" onClick={onStart}>
               Start
+            </Button>
+          )}
+
+          {/* VS Code button (only when started) */}
+          {isStarted && onOpenInVSCode && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={(e) => {
+                e.stopPropagation()
+                onOpenInVSCode()
+              }}
+              title="Open in VS Code with Claude"
+            >
+              <svg className="w-3.5 h-3.5 mr-1" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.583 2.167L11.5 8.25l-3.583-3.5L.833 9.333v5.334l7.084 4.583 3.583-3.5 6.083 6.083 6.584-4.25V6.417l-6.584-4.25zm-.916 14.5l-4.584-4.584 4.584-4.583v9.167z"/>
+              </svg>
+              VS Code
             </Button>
           )}
 

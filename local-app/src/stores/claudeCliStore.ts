@@ -42,6 +42,16 @@ interface JourneySummary {
   nextSteps: string[]
 }
 
+interface ProjectIntakeRefinement {
+  document: string
+}
+
+interface ProjectIntakeUpdate {
+  changes_summary: string
+  suggested_updates: string
+  updated_document: string
+}
+
 interface ClaudeCliState {
   // Status
   isProcessing: boolean
@@ -54,6 +64,8 @@ interface ClaudeCliState {
   lastAnalysis: JourneyAnalysis | null
   lastPlan: ImplementationPlan | null
   lastSummary: JourneySummary | null
+  lastProjectIntakeRefinement: ProjectIntakeRefinement | null
+  lastProjectIntakeUpdate: ProjectIntakeUpdate | null
 
   // Actions
   analyzeJourney: (description: string, projectContext?: string) => Promise<JourneyAnalysis | null>
@@ -61,6 +73,9 @@ interface ClaudeCliState {
   summarizeJourney: (journeyName: string, gitDiff: string, commitHistory: string, originalPlan?: string) => Promise<JourneySummary | null>
   queryRaw: (prompt: string) => Promise<string | null>
   queryJson: <T>(prompt: string, jsonSchema: string) => Promise<T | null>
+  // Project intake actions
+  refineProjectIntake: (rawIntake: string, projectName: string) => Promise<ProjectIntakeRefinement | null>
+  analyzeProjectIntakeChanges: (previousRaw: string, newRaw: string, existingAiDoc: string, projectName: string) => Promise<ProjectIntakeUpdate | null>
   refreshStatus: () => Promise<void>
   clearQueue: () => Promise<number>
   clearError: () => void
@@ -76,6 +91,8 @@ export const useClaudeCliStore = create<ClaudeCliState>((set, get) => ({
   lastAnalysis: null,
   lastPlan: null,
   lastSummary: null,
+  lastProjectIntakeRefinement: null,
+  lastProjectIntakeUpdate: null,
 
   // Analyze a journey idea
   analyzeJourney: async (description: string, projectContext?: string) => {
@@ -170,6 +187,44 @@ export const useClaudeCliStore = create<ClaudeCliState>((set, get) => ({
     }
   },
 
+  // Refine project intake into structured document
+  refineProjectIntake: async (rawIntake: string, projectName: string) => {
+    set({ isProcessing: true, lastError: null })
+    try {
+      const response = await window.electronAPI.claude.refineProjectIntake(rawIntake, projectName)
+      set({
+        isProcessing: false,
+        lastDurationMs: response.durationMs,
+        lastProjectIntakeRefinement: response.success ? response.data ?? null : null,
+        lastError: response.success ? null : response.error ?? 'Unknown error',
+      })
+      return response.success ? response.data ?? null : null
+    } catch (err) {
+      const error = (err as Error).message
+      set({ isProcessing: false, lastError: error })
+      return null
+    }
+  },
+
+  // Analyze changes to project intake and suggest AI doc updates
+  analyzeProjectIntakeChanges: async (previousRaw: string, newRaw: string, existingAiDoc: string, projectName: string) => {
+    set({ isProcessing: true, lastError: null })
+    try {
+      const response = await window.electronAPI.claude.analyzeProjectIntakeChanges(previousRaw, newRaw, existingAiDoc, projectName)
+      set({
+        isProcessing: false,
+        lastDurationMs: response.durationMs,
+        lastProjectIntakeUpdate: response.success ? response.data ?? null : null,
+        lastError: response.success ? null : response.error ?? 'Unknown error',
+      })
+      return response.success ? response.data ?? null : null
+    } catch (err) {
+      const error = (err as Error).message
+      set({ isProcessing: false, lastError: error })
+      return null
+    }
+  },
+
   // Refresh service status
   refreshStatus: async () => {
     try {
@@ -201,4 +256,4 @@ export const useClaudeCliStore = create<ClaudeCliState>((set, get) => ({
 }))
 
 // Export types for consumers
-export type { JourneyAnalysis, ImplementationPlan, JourneySummary, ClaudeCliResponse }
+export type { JourneyAnalysis, ImplementationPlan, JourneySummary, ClaudeCliResponse, ProjectIntakeRefinement, ProjectIntakeUpdate }

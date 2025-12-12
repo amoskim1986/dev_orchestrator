@@ -21,6 +21,12 @@ import {
   JOURNEY_ANALYSIS_SCHEMA,
   IMPLEMENTATION_PLAN_SCHEMA,
   JOURNEY_SUMMARY_SCHEMA,
+  // Project intake prompts
+  buildProjectIntakeRefinementPrompt,
+  buildProjectIntakeUpdatePrompt,
+  PROJECT_INTAKE_UPDATE_SCHEMA,
+  ProjectIntakeRefinement,
+  ProjectIntakeUpdate,
 } from '../services/claude-cli/prompts';
 
 // Response types for new prompts
@@ -212,6 +218,59 @@ export function registerClaudeCliIpc() {
     ) => {
       const prompt = buildJourneySummaryPrompt(journeyName, gitDiff, commitHistory, originalPlan);
       return service.queryJson<JourneySummary>(prompt, JOURNEY_SUMMARY_SCHEMA);
+    }
+  );
+
+  // =============================================================================
+  // PROJECT INTAKE: AI refinement for project-level intake documents
+  // =============================================================================
+
+  // Refine raw project intake into structured document
+  ipcMain.handle(
+    'claude:refineProjectIntake',
+    async (
+      _event,
+      {
+        rawIntake,
+        projectName,
+      }: {
+        rawIntake: string;
+        projectName: string;
+      }
+    ) => {
+      const prompt = buildProjectIntakeRefinementPrompt(rawIntake, projectName);
+      // For the initial refinement, we get back markdown directly (not JSON)
+      const result = await service.query({ prompt });
+      if (result.success && result.data) {
+        return {
+          success: true,
+          data: { document: result.data } as ProjectIntakeRefinement,
+          durationMs: result.durationMs,
+        };
+      }
+      return result;
+    }
+  );
+
+  // Analyze changes between raw intake versions and suggest AI doc updates
+  ipcMain.handle(
+    'claude:analyzeProjectIntakeChanges',
+    async (
+      _event,
+      {
+        previousRaw,
+        newRaw,
+        existingAiDoc,
+        projectName,
+      }: {
+        previousRaw: string;
+        newRaw: string;
+        existingAiDoc: string;
+        projectName: string;
+      }
+    ) => {
+      const prompt = buildProjectIntakeUpdatePrompt(previousRaw, newRaw, existingAiDoc, projectName);
+      return service.queryJson<ProjectIntakeUpdate>(prompt, PROJECT_INTAKE_UPDATE_SCHEMA);
     }
   );
 

@@ -332,5 +332,104 @@ export function buildCodeReviewPrompt(
   return prompt;
 }
 
+// =============================================================================
+// PROJECT INTAKE PROMPTS
+// =============================================================================
+
+export const PROJECT_INTAKE_SCHEMA = `{
+  document: string;
+}`;
+
+export const PROJECT_INTAKE_UPDATE_SCHEMA = `{
+  changes_summary: string;
+  suggested_updates: string;
+  updated_document: string;
+}`;
+
+export interface ProjectIntakeRefinement {
+  document: string;
+}
+
+export interface ProjectIntakeUpdate {
+  changes_summary: string;
+  suggested_updates: string;
+  updated_document: string;
+}
+
+/**
+ * Build prompt for refining a raw project intake into a structured document.
+ * Only includes sections where information is explicitly provided.
+ */
+export function buildProjectIntakeRefinementPrompt(
+  rawIntake: string,
+  projectName: string
+): string {
+  return `You are parsing a raw project intake document for a software project called "${projectName}".
+
+Your task is to transform the raw intake into a well-structured document.
+
+IMPORTANT RULES:
+1. ONLY include sections where information is explicitly provided in the raw intake
+2. Do NOT fabricate, assume, or fill in missing information
+3. If a section has no relevant content in the raw intake, DO NOT include that section at all
+4. Preserve the original meaning and intent - clarify, don't invent
+
+Available sections (include only if content exists):
+- Overview/Summary
+- Goals & Objectives
+- Key Features
+- Constraints/Limitations
+- Technical Requirements (include last, only if explicitly mentioned)
+- Architecture Notes (include last, only if explicitly mentioned)
+
+Raw Intake:
+${rawIntake}
+
+Format your response as a clean markdown document with appropriate headers (##) for each section you include. Return ONLY the document content, no preamble or explanation.`;
+}
+
+/**
+ * Build prompt for analyzing changes between raw intake versions
+ * and suggesting updates to the AI-parsed document.
+ */
+export function buildProjectIntakeUpdatePrompt(
+  previousRaw: string,
+  newRaw: string,
+  existingAiDoc: string,
+  projectName: string
+): string {
+  return `You are analyzing changes to a project intake document for "${projectName}".
+
+Compare the previous and new versions of the raw intake, identify meaningful changes, and suggest how to update the AI-refined document.
+
+Previous Raw Intake:
+${previousRaw}
+
+New Raw Intake:
+${newRaw}
+
+Current AI-Refined Document:
+${existingAiDoc}
+
+Provide:
+1. changes_summary: A concise bullet-point summary of what changed between the raw versions (what was added, removed, or modified)
+2. suggested_updates: Explanation of how these changes should affect the AI-refined document
+3. updated_document: The full updated AI-refined document incorporating the changes
+
+IMPORTANT RULES:
+- Only include sections where information is explicitly provided
+- Do NOT fabricate or assume missing information
+- Preserve existing content that wasn't changed
+- Add new content where explicitly added in the new raw intake
+- Remove content that was explicitly removed from the raw intake
+
+Return your response as valid JSON matching this schema:
+{
+  "changes_summary": "string with bullet points",
+  "suggested_updates": "string explaining updates",
+  "updated_document": "string with full markdown document"
+}`;
+}
+
 // Type exports for the response shapes
 export type { JourneyAnalysis, ImplementationPlan, JourneySummary };
