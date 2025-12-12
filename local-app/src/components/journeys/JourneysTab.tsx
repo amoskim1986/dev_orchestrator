@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useProjects } from '../../hooks/useProjects'
 import { useJourneys } from '../../hooks/useJourneys'
 import { JourneyDetailPanel } from './JourneyDetailPanel'
 import { JourneyCard } from './JourneyCard'
 import { Button } from '../common/Button'
 import { Input } from '../common/Input'
+import { ToastContainer, ToastData } from '../common/Toast'
 import type { Project, Journey, JourneyStage, JourneyType, JourneyUpdate } from '../../types'
 import { getStagesForType, getInitialStage } from '@dev-orchestrator/shared'
 
@@ -117,6 +118,17 @@ export function JourneysTab() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [selectedJourney, setSelectedJourney] = useState<Journey | null>(null)
   const [isCreating, setIsCreating] = useState(false)
+  const [toasts, setToasts] = useState<ToastData[]>([])
+
+  // Toast helpers
+  const showToast = useCallback((message: string, type: ToastData['type'] = 'error') => {
+    const id = `toast-${Date.now()}`
+    setToasts(prev => [...prev, { id, message, type }])
+  }, [])
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id))
+  }, [])
 
   // Filter journeys by active type
   const filteredJourneys = useMemo(() => {
@@ -190,7 +202,7 @@ export function JourneysTab() {
 
   const handleOpenInVSCode = async (journey: Journey) => {
     if (!selectedProject || !journey.worktree_path) {
-      console.log('Journey must be started first (no worktree path)')
+      showToast('Journey must be started first to open in VS Code', 'info')
       return
     }
     try {
@@ -203,10 +215,10 @@ export function JourneysTab() {
         projectRootPath: selectedProject.root_path,
       })
       if (!result.success) {
-        console.error('Failed to open VS Code:', result.error)
+        showToast(result.error || 'Failed to open VS Code', 'error')
       }
     } catch (err) {
-      console.error('Failed to open VS Code:', err)
+      showToast(err instanceof Error ? err.message : 'Failed to open VS Code', 'error')
     }
   }
 
@@ -402,6 +414,9 @@ export function JourneysTab() {
           }}
         />
       )}
+
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   )
 }
