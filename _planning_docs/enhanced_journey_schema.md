@@ -646,7 +646,7 @@ const createIntake = async (rawContent: string) => {
   - [x] Add `session_ai_tools` table
   - [x] Add all indexes
   - [x] Add updated_at triggers
-- [ ] Run migration against Supabase
+- [x] Run migration against Supabase
 
 ### Phase 2: TypeScript Types
 - [x] Update `shared/src/types/index.ts`

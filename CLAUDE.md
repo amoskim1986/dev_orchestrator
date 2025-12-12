@@ -104,14 +104,47 @@ cd web-app && npm run build
 ## Database (Supabase)
 Using Supabase PostgreSQL for cloud-first data storage.
 
-Key tables:
+### Core Tables
 - `projects` - id, name, root_path, frontend_path, backend_path, start commands
-- `journeys` - id, project_id, name, branch_name, worktree_path, status, ports, pids
+- `project_targets` - multi-target support (rails, web, electron, mobile, etc.)
+- `journeys` - id, project_id, type, stage, parent_journey_id, sort_order, etc.
 
-## Journey Status Flow
+### Journey Content Tables
+- `journey_intakes` - versioned raw + AI-refined intake documents
+- `journey_specs` - the "what" document (1:1 with journey)
+- `journey_plans` - the "how" document (1:1 with journey)
+- `journey_checklists` - per-leg task lists with typed items
+
+### Journey Relationship Tables
+- `journey_links` - flexible relationships (spawned_from, blocks, depends_on, related_to)
+- `journey_targets` - which targets a journey affects
+
+### Session Tables
+- `journey_sessions` - session lifecycle (many per journey)
+- `session_processes` - running processes per session per target
+- `session_ai_tools` - AI tools used per session (Claude Code, Cursor, etc.)
+
+### Running Migrations
+Migrations are in `local-app/supabase/migrations/`. Run them with psql:
+
+```bash
+# Connection info is in local-app/.env
+PGPASSWORD="$VITE_SUPABASE_DB_PW" psql \
+  -h db.bxkxrzbgnfdurlshrgzu.supabase.co \
+  -U postgres \
+  -d postgres \
+  -f local-app/supabase/migrations/XXX_migration_name.sql
 ```
-Planning → In Progress → Ready → Deployed
-```
+
+## Journey Types & Stages
+Journeys have a `type` that determines available `stage` values:
+
+| Type | Stages |
+|------|--------|
+| `feature_planning` | intake → speccing → ui_planning → planning → review → approved |
+| `feature` | review_and_edit_plan → implementing → testing → pre_prod_review → merge_approved → staging_qa → deployed |
+| `investigation` | intake → speccing → planning → approved → in_progress → complete |
+| `bug` | reported → investigating → fixing → testing → pre_prod_review → merge_approved → staging_qa → deployed |
 
 ## Implementation Progress
 - [x] Phase 0: Folder structure
@@ -119,6 +152,7 @@ Planning → In Progress → Ready → Deployed
 - [x] Phase 2: Supabase data layer
 - [x] Phase 3: Basic UI (local + web)
 - [x] Shared package setup
+- [x] Phase 3.5: Enhanced journey schema (types, stages, multi-target, sessions)
 - [ ] Phase 4: Git worktree integration
 - [ ] Phase 5: Claude Code launcher
 - [ ] Phase 6: Process management
