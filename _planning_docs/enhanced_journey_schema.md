@@ -632,67 +632,73 @@ const createIntake = async (rawContent: string) => {
 ## Implementation Checklist
 
 ### Phase 1: Database Migration
-- [ ] Create migration file `local-app/supabase/migrations/002_journey_enhancements.sql`
-  - [ ] Add `project_targets` table
-  - [ ] Update `journeys` table (add new columns, drop old ones)
-  - [ ] Add `journey_intakes` table
-  - [ ] Add `journey_specs` table
-  - [ ] Add `journey_plans` table
-  - [ ] Add `journey_checklists` table
-  - [ ] Add `journey_links` table
-  - [ ] Add `journey_targets` table
-  - [ ] Add `journey_sessions` table
-  - [ ] Add `session_processes` table
-  - [ ] Add `session_ai_tools` table
-  - [ ] Add all indexes
-  - [ ] Add updated_at triggers
+- [x] Create migration file `local-app/supabase/migrations/002_journey_enhancements.sql`
+  - [x] Add `project_targets` table
+  - [x] Update `journeys` table (add new columns, drop old ones)
+  - [x] Add `journey_intakes` table
+  - [x] Add `journey_specs` table
+  - [x] Add `journey_plans` table
+  - [x] Add `journey_checklists` table
+  - [x] Add `journey_links` table
+  - [x] Add `journey_targets` table
+  - [x] Add `journey_sessions` table
+  - [x] Add `session_processes` table
+  - [x] Add `session_ai_tools` table
+  - [x] Add all indexes
+  - [x] Add updated_at triggers
 - [ ] Run migration against Supabase
 
 ### Phase 2: TypeScript Types
-- [ ] Update `shared/src/types/index.ts`
-  - [ ] Add `JourneyType` type
-  - [ ] Add stage types (`FeaturePlanningStage`, `FeatureStage`, `InvestigationStage`, `BugStage`)
-  - [ ] Add `JourneyStage` union type
-  - [ ] Add `TargetType` type
-  - [ ] Add `ChecklistItemType` type
-  - [ ] Add `JourneyRelationship` type
-  - [ ] Add `SessionStatus` type
-  - [ ] Add `ProcessStatus` type
-  - [ ] Update `Journey` interface
-  - [ ] Add `ProjectTarget` interface
-  - [ ] Add `JourneyIntake` interface
-  - [ ] Add `JourneySpec` interface
-  - [ ] Add `JourneyPlan` interface
-  - [ ] Add `ChecklistItem` interface
-  - [ ] Add `JourneyChecklist` interface
-  - [ ] Add `JourneyLink` interface
-  - [ ] Add `JourneySession` interface
-  - [ ] Add `SessionProcess` interface
-  - [ ] Add `SessionAiTool` interface
-  - [ ] Add Insert/Update types for new tables
-- [ ] Update `local-app/src/types/database.ts` with new table interfaces
+- [x] Update `shared/src/types/index.ts`
+  - [x] Add `JourneyType` type
+  - [x] Add stage types (`FeaturePlanningStage`, `FeatureStage`, `InvestigationStage`, `BugStage`)
+  - [x] Add `JourneyStage` union type
+  - [x] Add `TargetType` type
+  - [x] Add `ChecklistItemType` type
+  - [x] Add `JourneyRelationship` type
+  - [x] Add `SessionStatus` type
+  - [x] Add `ProcessStatus` type
+  - [x] Update `Journey` interface
+  - [x] Add `ProjectTarget` interface
+  - [x] Add `JourneyIntake` interface
+  - [x] Add `JourneySpec` interface
+  - [x] Add `JourneyPlan` interface
+  - [x] Add `ChecklistItem` interface
+  - [x] Add `JourneyChecklist` interface
+  - [x] Add `JourneyLink` interface
+  - [x] Add `JourneySession` interface
+  - [x] Add `SessionProcess` interface
+  - [x] Add `SessionAiTool` interface
+  - [x] Add Insert/Update types for new tables
+- [x] Update `local-app/src/types/database.ts` with new table interfaces
 
 ### Phase 3: React Hooks
-- [ ] Update `shared/src/hooks/useJourneys.ts`
-  - [ ] Update for new Journey fields
-  - [ ] Remove `startJourney` helper
-  - [ ] Add `updateStage(id, stage)` method
-- [ ] Create `shared/src/hooks/useProjectTargets.ts`
-- [ ] Create `shared/src/hooks/useJourneyIntakes.ts`
-  - [ ] Basic CRUD
-  - [ ] AI refinement integration (Electron only)
-- [ ] Create `shared/src/hooks/useJourneySpecs.ts`
-- [ ] Create `shared/src/hooks/useJourneyPlans.ts`
-- [ ] Create `shared/src/hooks/useJourneyChecklists.ts`
-  - [ ] CRUD for checklists
-  - [ ] Toggle item done/undone
-  - [ ] Set active checklist
-- [ ] Create `shared/src/hooks/useJourneyLinks.ts`
-- [ ] Create `shared/src/hooks/useJourneySessions.ts`
-  - [ ] Session lifecycle management
-  - [ ] Process tracking
-  - [ ] AI tool tracking
-- [ ] Update `shared/src/hooks/index.ts` to export new hooks
+- [x] Update `shared/src/hooks/useJourneys.ts`
+  - [x] Update for new Journey fields
+  - [x] Keep `startJourney` helper (still useful for setting branch/worktree)
+  - [x] Add `updateStage(id, stage)` method
+  - [x] Add `updateType(id, type)` method
+  - [x] Add `updateSortOrder(id, sortOrder)` method
+  - [x] Add `getReadyJourneys()` method
+  - [x] Add `getChildJourneys(parentId)` method
+- [x] Create `shared/src/hooks/useProjectTargets.ts`
+- [x] Create `shared/src/hooks/useJourneyIntakes.ts`
+  - [x] Basic CRUD
+  - [ ] AI refinement integration (Electron only) - *deferred to Phase 5*
+- [x] Create `shared/src/hooks/useJourneySpecs.ts`
+- [x] Create `shared/src/hooks/useJourneyPlans.ts`
+- [x] Create `shared/src/hooks/useJourneyChecklists.ts`
+  - [x] CRUD for checklists
+  - [x] Toggle item done/undone
+  - [x] Set active checklist
+  - [x] Add/remove items
+  - [x] Get completion percentage
+- [x] Create `shared/src/hooks/useJourneyLinks.ts`
+- [x] Create `shared/src/hooks/useJourneySessions.ts`
+  - [x] Session lifecycle management
+  - [x] Process tracking (`useSessionProcesses`)
+  - [x] AI tool tracking (`useSessionAiTools`)
+- [x] Update `shared/src/hooks/index.ts` to export new hooks
 
 ### Phase 4: UI Updates (Future)
 - [ ] Update journey list to show type/stage badges

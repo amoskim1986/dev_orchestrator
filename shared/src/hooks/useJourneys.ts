@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { getSupabase } from '../lib/supabase';
-import type { Journey, JourneyInsert, JourneyUpdate } from '../types';
+import type { Journey, JourneyInsert, JourneyUpdate, JourneyStage, JourneyType } from '../types';
+import { getInitialStage } from '../types';
 
 export function useJourneys(projectId?: string) {
   const [journeys, setJourneys] = useState<Journey[]>([]);
@@ -14,6 +15,7 @@ export function useJourneys(projectId?: string) {
     let query = getSupabase()
       .from('journeys')
       .select('*')
+      .order('sort_order', { ascending: true })
       .order('created_at', { ascending: false });
 
     if (projectId) {
@@ -31,9 +33,17 @@ export function useJourneys(projectId?: string) {
   }, [projectId]);
 
   const createJourney = useCallback(async (journey: JourneyInsert): Promise<Journey> => {
+    // Set initial stage based on type if not provided
+    const type = journey.type || 'feature';
+    const journeyWithDefaults: JourneyInsert = {
+      ...journey,
+      type,
+      stage: journey.stage || getInitialStage(type),
+    };
+
     const { data, error: createError } = await getSupabase()
       .from('journeys')
-      .insert(journey)
+      .insert(journeyWithDefaults)
       .select()
       .single();
 
@@ -69,7 +79,20 @@ export function useJourneys(projectId?: string) {
     setJourneys(prev => prev.filter(j => j.id !== id));
   }, []);
 
-  // Start a journey: sets branch_name, worktree_path, and status
+  // Update journey stage
+  const updateStage = useCallback(async (id: string, stage: JourneyStage): Promise<Journey> => {
+    return updateJourney(id, { stage });
+  }, [updateJourney]);
+
+  // Update journey type (will also reset stage to initial for that type)
+  const updateType = useCallback(async (id: string, type: JourneyType): Promise<Journey> => {
+    return updateJourney(id, {
+      type,
+      stage: getInitialStage(type),
+    });
+  }, [updateJourney]);
+
+  // Start a journey: sets branch_name and worktree_path
   const startJourney = useCallback(async (
     id: string,
     branchName: string,
@@ -78,9 +101,33 @@ export function useJourneys(projectId?: string) {
     return updateJourney(id, {
       branch_name: branchName,
       worktree_path: worktreePath,
-      status: 'in_progress',
     });
   }, [updateJourney]);
+
+  // Update sort order for drag-and-drop reordering
+  const updateSortOrder = useCallback(async (id: string, sortOrder: number): Promise<Journey> => {
+    return updateJourney(id, { sort_order: sortOrder });
+  }, [updateJourney]);
+
+  // Get journeys that are ready to work on (no blocking dependencies)
+  const getReadyJourneys = useCallback(() => {
+    return journeys.filter(j => {
+      if (!j.can_parallelize) return false;
+      if (!j.depends_on_journey_id) return true;
+
+      const dependency = journeys.find(d => d.id === j.depends_on_journey_id);
+      if (!dependency) return true;
+
+      // Check if dependency is in a "done" stage
+      const doneStages = ['complete', 'deployed', 'approved'];
+      return doneStages.includes(dependency.stage);
+    });
+  }, [journeys]);
+
+  // Get child journeys of a parent
+  const getChildJourneys = useCallback((parentId: string) => {
+    return journeys.filter(j => j.parent_journey_id === parentId);
+  }, [journeys]);
 
   useEffect(() => {
     fetchJourneys();
@@ -93,7 +140,12 @@ export function useJourneys(projectId?: string) {
     createJourney,
     updateJourney,
     deleteJourney,
+    updateStage,
+    updateType,
     startJourney,
+    updateSortOrder,
+    getReadyJourneys,
+    getChildJourneys,
     refetch: fetchJourneys,
   };
 }
