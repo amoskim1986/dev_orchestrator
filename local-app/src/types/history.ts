@@ -20,16 +20,21 @@ export interface ClaudeSession {
 
 export interface ClaudeMessage {
   uuid?: string
-  type: 'user' | 'assistant'
+  type: 'user' | 'assistant' | 'tool_result'
   timestamp: Date
   content: MessageContent[]
   model?: string
   usage?: TokenUsage
+  toolUseResult?: {
+    durationMs?: number
+    numFiles?: number
+    truncated?: boolean
+  }
 }
 
 export type MessageContent =
   | { type: 'text'; text: string }
-  | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
+  | { type: 'tool_use'; id: string; name: string; input?: Record<string, unknown> }
   | { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean }
 
 export interface TokenUsage {

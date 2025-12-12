@@ -23,23 +23,54 @@ export interface ClaudeSession {
 
 export interface ClaudeMessage {
   uuid?: string
-  type: 'user' | 'assistant'
+  type: 'user' | 'assistant' | 'tool_result'
   timestamp: Date
-  content: Array<{ type: string; text?: string; name?: string; id?: string; input?: unknown }>
+  content: Array<{
+    type: string
+    text?: string
+    name?: string
+    id?: string
+    input?: Record<string, unknown>
+    tool_use_id?: string
+    content?: string
+    is_error?: boolean
+  }>
   model?: string
+  toolUseResult?: {
+    durationMs?: number
+    numFiles?: number
+    truncated?: boolean
+  }
 }
 
 interface RawEntry {
   type: string
   message?: {
     role: string
-    content: string | Array<{ type: string; text?: string; thinking?: string }>
+    content:
+      | string
+      | Array<{
+          type: string
+          text?: string
+          thinking?: string
+          name?: string
+          id?: string
+          input?: Record<string, unknown>
+          tool_use_id?: string
+          content?: string
+          is_error?: boolean
+        }>
     model?: string
   }
   timestamp?: string
   gitBranch?: string
   model?: string
   uuid?: string
+  toolUseResult?: {
+    durationMs?: number
+    numFiles?: number
+    truncated?: boolean
+  }
 }
 
 class ClaudeHistoryService {
@@ -265,29 +296,38 @@ class ClaudeHistoryService {
         const entry: RawEntry = JSON.parse(line)
 
         if ((entry.type === 'user' || entry.type === 'assistant') && entry.message) {
-          // Normalize content to always be an array of text items
-          let normalizedContent: Array<{ type: string; text?: string; name?: string; id?: string; input?: unknown }>
+          // Normalize content to always be an array
+          let normalizedContent: ClaudeMessage['content'] = []
+          let isToolResult = false
 
           if (typeof entry.message.content === 'string') {
             // Simple string content - wrap in array
             normalizedContent = [{ type: 'text', text: entry.message.content }]
           } else if (Array.isArray(entry.message.content)) {
-            // Array content - extract text from various block types
-            normalizedContent = []
-
+            // Array content - extract from various block types
             for (const block of entry.message.content) {
               if (block.type === 'text' && block.text) {
                 // Regular text block
                 normalizedContent.push({ type: 'text', text: block.text })
               } else if (block.type === 'tool_use') {
-                // Tool use - show which tool was called
+                // Tool use - include name, id, AND input
                 normalizedContent.push({
                   type: 'tool_use',
-                  name: (block as { name?: string }).name,
-                  id: (block as { id?: string }).id,
+                  name: block.name,
+                  id: block.id,
+                  input: block.input,
+                })
+              } else if (block.type === 'tool_result') {
+                // Tool result - include the content
+                isToolResult = true
+                normalizedContent.push({
+                  type: 'tool_result',
+                  tool_use_id: block.tool_use_id,
+                  content: block.content,
+                  is_error: block.is_error,
                 })
               }
-              // Skip: thinking blocks, tool_result (system data), etc.
+              // Skip: thinking blocks, etc.
             }
 
             // Skip if no displayable content after filtering
@@ -300,10 +340,11 @@ class ClaudeHistoryService {
 
           messages.push({
             uuid: entry.uuid,
-            type: entry.type as 'user' | 'assistant',
+            type: isToolResult ? 'tool_result' : (entry.type as 'user' | 'assistant'),
             timestamp: entry.timestamp ? new Date(entry.timestamp) : new Date(),
             content: normalizedContent,
             model: entry.message.model || entry.model,
+            toolUseResult: entry.toolUseResult,
           })
         }
       } catch {

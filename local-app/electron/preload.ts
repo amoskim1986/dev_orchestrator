@@ -21,10 +21,24 @@ interface ClaudeSession {
 
 interface ClaudeMessage {
   uuid?: string
-  type: 'user' | 'assistant'
+  type: 'user' | 'assistant' | 'tool_result'
   timestamp: Date
-  content: Array<{ type: string; text?: string; name?: string; id?: string; input?: unknown }>
+  content: Array<{
+    type: string
+    text?: string
+    name?: string
+    id?: string
+    input?: Record<string, unknown>
+    tool_use_id?: string
+    content?: string
+    is_error?: boolean
+  }>
   model?: string
+  toolUseResult?: {
+    durationMs?: number
+    numFiles?: number
+    truncated?: boolean
+  }
 }
 
 // Claude CLI service types
