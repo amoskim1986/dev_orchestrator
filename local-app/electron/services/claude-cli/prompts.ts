@@ -4,6 +4,198 @@
 
 import { JourneyAnalysis, ImplementationPlan, JourneySummary } from './types';
 
+// =============================================================================
+// INTAKE REFINEMENT PROMPTS
+// =============================================================================
+
+export const REFINED_INTAKE_SCHEMA = `{
+  title: string;
+  problem: string;
+  proposedSolution: string;
+  userStories: string[];
+  acceptanceCriteria: string[];
+  outOfScope: string[];
+  openQuestions: string[];
+}`;
+
+/**
+ * Build prompt for refining a raw intake into a structured format
+ */
+export function buildIntakeRefinementPrompt(
+  rawIntake: string,
+  journeyType: 'feature_planning' | 'feature' | 'bug' | 'investigation',
+  projectContext?: string
+): string {
+  const typeSpecificGuidance = {
+    feature_planning: `This is a feature planning journey. Focus on:
+- Clarifying the problem being solved
+- Breaking down into user stories
+- Defining clear acceptance criteria
+- Identifying what's explicitly out of scope`,
+    feature: `This is a feature implementation journey. Focus on:
+- Technical requirements
+- Implementation constraints
+- Integration points
+- Testing requirements`,
+    bug: `This is a bug fix journey. Focus on:
+- Reproducing the issue
+- Impact and severity
+- Expected vs actual behavior
+- Steps to reproduce`,
+    investigation: `This is an investigation journey. Focus on:
+- What needs to be learned/discovered
+- Success criteria for the investigation
+- Deliverables (documentation, POC, recommendation)
+- Time constraints`,
+  };
+
+  let prompt = `Refine this raw feature intake into a well-structured format.
+
+Raw Intake:
+${rawIntake}
+
+${typeSpecificGuidance[journeyType]}`;
+
+  if (projectContext) {
+    prompt += `\n\nProject Context:\n${projectContext}`;
+  }
+
+  prompt += `
+
+Transform this into a clear, actionable intake document. Preserve the original intent but add structure, clarity, and completeness. If information is missing, note it in openQuestions.`;
+
+  return prompt;
+}
+
+// =============================================================================
+// SPEC GENERATION PROMPTS
+// =============================================================================
+
+export const SPEC_SCHEMA = `{
+  overview: string;
+  goals: string[];
+  nonGoals: string[];
+  technicalApproach: {
+    summary: string;
+    components: { name: string; purpose: string; changes: string }[];
+  };
+  dataModel: {
+    newEntities: { name: string; fields: string[] }[];
+    modifiedEntities: { name: string; changes: string }[];
+  };
+  apiChanges: {
+    newEndpoints: { method: string; path: string; purpose: string }[];
+    modifiedEndpoints: { method: string; path: string; changes: string }[];
+  };
+  uiChanges: {
+    newScreens: { name: string; purpose: string }[];
+    modifiedScreens: { name: string; changes: string }[];
+  };
+  testing: {
+    unitTests: string[];
+    integrationTests: string[];
+    e2eTests: string[];
+  };
+  rollout: {
+    featureFlags: string[];
+    migrationSteps: string[];
+    rollbackPlan: string;
+  };
+  openQuestions: string[];
+}`;
+
+/**
+ * Build prompt for generating a spec from a refined intake
+ */
+export function buildSpecGenerationPrompt(
+  refinedIntake: string,
+  projectContext?: string,
+  techStack?: string
+): string {
+  let prompt = `Create a detailed technical specification from this refined intake.
+
+Refined Intake:
+${refinedIntake}`;
+
+  if (techStack) {
+    prompt += `\n\nTech Stack: ${techStack}`;
+  }
+
+  if (projectContext) {
+    prompt += `\n\nProject Context:\n${projectContext}`;
+  }
+
+  prompt += `
+
+Generate a comprehensive spec that covers:
+1. Technical approach and architecture
+2. Data model changes
+3. API changes
+4. UI/UX changes
+5. Testing strategy
+6. Rollout and migration plan
+
+Be specific about what needs to be built, modified, or removed.`;
+
+  return prompt;
+}
+
+// =============================================================================
+// PLAN GENERATION PROMPTS
+// =============================================================================
+
+export const PLAN_SCHEMA = `{
+  summary: string;
+  estimatedEffort: "small" | "medium" | "large" | "x-large";
+  phases: {
+    name: string;
+    description: string;
+    tasks: {
+      title: string;
+      description: string;
+      estimatedHours: number;
+      dependencies: string[];
+      deliverables: string[];
+    }[];
+  }[];
+  risks: { risk: string; mitigation: string; severity: "low" | "medium" | "high" }[];
+  milestones: { name: string; criteria: string }[];
+}`;
+
+/**
+ * Build prompt for generating an implementation plan from a spec
+ */
+export function buildPlanGenerationPrompt(
+  spec: string,
+  projectContext?: string
+): string {
+  let prompt = `Create a detailed implementation plan from this technical specification.
+
+Specification:
+${spec}`;
+
+  if (projectContext) {
+    prompt += `\n\nProject Context:\n${projectContext}`;
+  }
+
+  prompt += `
+
+Generate an actionable implementation plan that:
+1. Breaks work into logical phases
+2. Identifies task dependencies
+3. Estimates effort for each task
+4. Highlights risks and mitigations
+5. Defines clear milestones
+
+Each task should be independently completable and testable.`;
+
+  return prompt;
+}
+
+// =============================================================================
+// LEGACY PROMPTS (kept for backwards compatibility)
+// =============================================================================
+
 export const JOURNEY_ANALYSIS_SCHEMA = `{
   title: string;
   complexity: 1 | 2 | 3 | 4 | 5;

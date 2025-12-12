@@ -1,24 +1,17 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useRef, useState, useEffect, useCallback } from 'react'
-import type { ClaudeMessage, MessageContent } from '../../types/history'
+import type { ClaudeMessage } from '../../types/history'
 
 interface ConversationViewerProps {
   messages: ClaudeMessage[]
   isLoading: boolean
 }
 
-interface SearchMatch {
-  messageIndex: number
-  textIndex: number
-  startPos: number
-  endPos: number
-}
-
 interface MessageBubbleProps {
   message: ClaudeMessage
   searchQuery: string
   isCurrentMatch: boolean
-  matchRef?: React.RefObject<HTMLDivElement | null>
+  matchRef?: React.RefObject<HTMLDivElement>
 }
 
 function highlightText(text: string, query: string, isCurrentMatch: boolean): React.ReactNode {

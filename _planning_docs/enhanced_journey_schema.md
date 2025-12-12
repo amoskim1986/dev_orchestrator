@@ -1,8 +1,9 @@
 # Enhanced Journey Schema & Multi-Target Projects
 
-> **Status**: Planning Complete
+> **Status**: Partially Implemented
 > **Created**: 2024-12-12
-> **Scope**: Database schema expansion, TypeScript types, React hooks
+> **Last Updated**: 2024-12-12
+> **Scope**: Database schema expansion, TypeScript types, React hooks, UI components
 
 ---
 
@@ -16,6 +17,242 @@ This document outlines the expanded database schema to support:
 4. **Multi-Target Projects** (rails, web, electron, mobile, chrome extension, etc.)
 5. **Session Tracking** with multiple AI tools (Claude Code, Cursor, Copilot, etc.)
 6. **Parallelization Support** for concurrent journey execution
+
+---
+
+## Pending UI Features (Summary)
+
+The journey detail panel should have **tabs** for different aspects of a journey:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Journey: "Add User Authentication"                         ✕  │
+│  📋 Feature Planning • Stage: speccing                          │
+├─────────────────────────────────────────────────────────────────┤
+│  [Overview] [Intake] [Spec] [Plan] [Checklists] [Links]        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Tab content here...                                            │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  [← Previous Stage]  [Next Stage →]  [Open Claude Code]        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Tab Descriptions
+
+| Tab | Content | Status |
+|-----|---------|--------|
+| **Overview** | Basic info, description, tags, source URL, stage progress | ✅ Done |
+| **Intake** | Raw content, AI-refined content, version history | ❌ Pending |
+| **Spec** | Markdown spec document, AI generation button | ❌ Pending |
+| **Plan** | Structured implementation plan with legs/steps | ❌ Pending |
+| **Checklists** | Per-leg task lists with typed items | ❌ Pending |
+| **Links** | Related journeys, parent/children, dependencies | ❌ Pending |
+
+### Derivative Journeys
+
+When a Feature Planning journey reaches "approved" stage:
+- Show "Spawn Feature Journey" button
+- Creates a new Feature journey linked to the plan
+- The Feature journey shows breadcrumb: "From: [Parent Journey Name]"
+- Parent shows list of spawned children
+
+### Current Implementation
+
+What's done:
+- Tabbed journey type interface (Feature Planning, Feature, Bug, Investigation)
+- Journey cards with type/stage badges
+- Detail panel with edit capability
+- Stage forward/backward navigation
+- Quick intake form per type tab
+
+---
+
+## Detailed Tab Mockups
+
+### Intake Tab
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  INTAKE                                                         │
+├─────────────────────────────────────────────────────────────────┤
+│  Version: v3 (Latest)  [v1] [v2] [v3]                          │
+│                                                                 │
+│  ┌─ Raw Content ─────────────────────────────────────────────┐ │
+│  │ Users should be able to log in with email/password.       │ │
+│  │ We also need OAuth support for Google and GitHub.         │ │
+│  │ The session should persist across browser closes.         │ │
+│  └───────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│  [🤖 Refine with AI]                                           │
+│                                                                 │
+│  ┌─ AI Refined ──────────────────────────────────────────────┐ │
+│  │ **Title**: User Authentication System                      │ │
+│  │                                                            │ │
+│  │ **Problem**: Users need secure authentication with         │ │
+│  │ multiple login options and persistent sessions.            │ │
+│  │                                                            │ │
+│  │ **User Stories**:                                          │ │
+│  │ - As a user, I can log in with email/password              │ │
+│  │ - As a user, I can log in with Google OAuth                │ │
+│  │ - As a user, I can log in with GitHub OAuth                │ │
+│  │ - As a user, my session persists when I close browser      │ │
+│  │                                                            │ │
+│  │ **Acceptance Criteria**:                                   │ │
+│  │ - [ ] Login form validates email format                    │ │
+│  │ - [ ] Password has minimum strength requirements           │ │
+│  │ - [ ] OAuth buttons redirect correctly                     │ │
+│  │ - [ ] Session cookie is httpOnly and secure                │ │
+│  └───────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│  [Save Changes]  [Generate Spec →]                             │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Spec Tab
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  SPEC                                          [🤖 Generate]    │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │ # User Authentication System                                ││
+│  │                                                             ││
+│  │ ## Overview                                                 ││
+│  │ Implement a secure authentication system supporting         ││
+│  │ email/password and OAuth providers.                         ││
+│  │                                                             ││
+│  │ ## Technical Approach                                       ││
+│  │                                                             ││
+│  │ ### Components                                              ││
+│  │ | Component | Purpose | Changes |                          ││
+│  │ |-----------|---------|---------|                          ││
+│  │ | AuthContext | Store auth state | New |                   ││
+│  │ | LoginForm | Email/password form | New |                  ││
+│  │ | OAuthButtons | Google/GitHub | New |                     ││
+│  │                                                             ││
+│  │ ### API Changes                                             ││
+│  │ - POST /api/auth/login                                      ││
+│  │ - POST /api/auth/register                                   ││
+│  │ - GET /api/auth/oauth/:provider                             ││
+│  │ - POST /api/auth/logout                                     ││
+│  │                                                             ││
+│  │ ## Testing                                                  ││
+│  │ - Unit tests for auth context                               ││
+│  │ - Integration tests for login flow                          ││
+│  │ - E2E test for complete auth journey                        ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                 │
+│  [Save]  [Generate Plan →]                                     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Plan Tab
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  PLAN                                          [🤖 Generate]    │
+├─────────────────────────────────────────────────────────────────┤
+│  Estimated Effort: Medium (~3-5 days)                          │
+│                                                                 │
+│  ┌─ Leg 1: Backend Auth Setup ──────────────────────────────┐  │
+│  │  ≡  [Expand/Collapse]                                     │  │
+│  │                                                           │  │
+│  │  Tasks:                                                   │  │
+│  │  1. Create User model with password digest                │  │
+│  │  2. Add sessions table for token storage                  │  │
+│  │  3. Create AuthController with login/logout actions       │  │
+│  │  4. Add JWT token generation service                      │  │
+│  │                                                           │  │
+│  │  Files to create: app/models/user.rb, app/controllers/... │  │
+│  │  Est. time: 4 hours                                       │  │
+│  │                                                           │  │
+│  │  [Edit] [Delete] [↑] [↓]                                  │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  ┌─ Leg 2: Frontend Auth Components ────────────────────────┐  │
+│  │  ≡  [Expand/Collapse]                                     │  │
+│  │  ...                                                      │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  ┌─ Leg 3: OAuth Integration ───────────────────────────────┐  │
+│  │  ...                                                      │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  [+ Add Leg]                                                    │
+│                                                                 │
+│  [Save]  [Generate Checklists →]                               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Checklists Tab
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  CHECKLISTS                                                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Leg 1: Backend Auth Setup          [2/5 complete] ████░░░ 40% │
+│  ─────────────────────────────────────────────────────────────  │
+│  ☑ 📦 Create User model              ✓ Dec 10                  │
+│  ☑ 📦 Add sessions table             ✓ Dec 10                  │
+│  ☐ 📦 Create AuthController                                    │
+│  ☐ 🧪 Unit tests for User model                                │
+│  ☐ 👁 Verify password hashing works                            │
+│  [+ Add item]                                                   │
+│                                                                 │
+│  Leg 2: Frontend Auth               [0/4 complete] ░░░░░░░  0% │
+│  ─────────────────────────────────────────────────────────────  │
+│  ☐ 📦 Create AuthContext                                       │
+│  ☐ 📦 Build LoginForm component                                │
+│  ☐ 🧪 Jest tests for AuthContext                               │
+│  ☐ 👁 Manual test login flow                                   │
+│  [+ Add item]                                                   │
+│                                                                 │
+│  Legend: 📦 Deliverable  🧪 Test  👁 Manual Check              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Links Tab (Derivative Journeys)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  LINKS & RELATIONSHIPS                                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─ Parent Journey ─────────────────────────────────────────┐  │
+│  │  (none - this is a root journey)                          │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  ┌─ Spawned From This Plan (2) ─────────────────────────────┐  │
+│  │                                                           │  │
+│  │  ✨ [Feature] Implement Auth Backend    Stage: testing   │  │
+│  │     └─ Leg 1 & 2 of this plan                            │  │
+│  │                                                           │  │
+│  │  ✨ [Feature] Implement Auth Frontend   Stage: implementing│  │
+│  │     └─ Leg 3 of this plan                                │  │
+│  │                                                           │  │
+│  │  [+ Spawn New Feature Journey]                            │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  ┌─ Dependencies ───────────────────────────────────────────┐  │
+│  │                                                           │  │
+│  │  This journey depends on:                                 │  │
+│  │  (none)                                                   │  │
+│  │                                                           │  │
+│  │  Blocked by this journey:                                 │  │
+│  │  🐛 [Bug] Fix session timeout    Stage: reported         │  │
+│  │                                                           │  │
+│  │  [+ Add Dependency]                                       │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  ┌─ Related Journeys ───────────────────────────────────────┐  │
+│  │  🔍 [Investigation] OAuth Provider Research  Stage: complete│  │
+│  │  [+ Link Related Journey]                                 │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -700,23 +937,86 @@ const createIntake = async (rawContent: string) => {
   - [x] AI tool tracking (`useSessionAiTools`)
 - [x] Update `shared/src/hooks/index.ts` to export new hooks
 
-### Phase 4: UI Updates (Future)
-- [ ] Update journey list to show type/stage badges
-- [ ] Add journey type selector on create
-- [ ] Add stage transition UI
-- [ ] Add intake editor with AI refinement
-- [ ] Add spec/plan viewers
-- [ ] Add checklist UI with typed items
-- [ ] Add session management panel
-- [ ] Add project targets configuration
-- [ ] Add drag-to-reorder for journeys
+### Phase 4: UI Updates
+**Completed:**
+- [x] Update journey list to show type/stage badges (`TypeBadge`, `StageBadge` components)
+- [x] Add journey type selector on create (tabbed interface with 4 journey types)
+- [x] Add stage transition UI (forward/backward stage buttons in detail panel)
+- [x] Journey detail panel (slide-out panel with edit capability)
+- [x] Quick intake form per journey type tab
 
-### Phase 5: Claude CLI Integration (Future)
-- [ ] Add intake refinement prompt
-- [ ] Add spec generation prompt
-- [ ] Add plan generation prompt
-- [ ] Wire up AI refinement in `useJourneyIntakes`
-- [ ] Add loading states for AI operations
+**Pending:**
+- [ ] **Intake Editor Tab** - Full intake editing with version history
+  - [ ] Raw content textarea
+  - [ ] AI refinement button (calls Claude CLI)
+  - [ ] Version history viewer (show all intake versions)
+  - [ ] Side-by-side raw vs refined view
+- [ ] **Spec Tab** - Spec viewer/editor
+  - [ ] Markdown editor for spec content
+  - [ ] AI-assisted spec generation from refined intake
+  - [ ] Version tracking
+- [ ] **Plan Tab** - Implementation plan viewer/editor
+  - [ ] Structured plan display (legs/steps)
+  - [ ] AI-assisted plan generation from spec
+  - [ ] Leg/step reordering
+  - [ ] Edit individual steps
+  - [ ] Time estimates per step
+- [ ] **Checklists Tab** - Per-leg task management
+  - [ ] Display checklists per leg
+  - [ ] Toggle items done/undone
+  - [ ] Progress percentage display
+  - [ ] Typed items (deliverable, test, manual_check) with icons
+  - [ ] Add/remove items inline
+- [ ] **Derivative Journeys** - Parent/child journey relationships
+  - [ ] Show child journeys in parent's detail panel
+  - [ ] "Spawn Feature Journey" button on approved Feature Planning
+  - [ ] Link indicator on spawned journeys
+  - [ ] Breadcrumb navigation to parent
+- [ ] **Journey Links** - Relationship management
+  - [ ] Display related journeys (blocks, depends_on, related_to)
+  - [ ] Add/remove links between journeys
+  - [ ] Dependency graph visualization (optional)
+- [ ] **Session Management Panel**
+  - [ ] Show active/past sessions
+  - [ ] Display running processes per session
+  - [ ] AI tool usage tracking
+  - [ ] Session notes
+- [ ] **Project Targets Configuration**
+  - [ ] Add/edit/remove project targets
+  - [ ] Configure start commands per target
+  - [ ] Port allocation
+- [ ] **Drag-to-reorder for journeys** - Manual sorting
+- [ ] **Journey Filters** - Filter by stage, tag, has-blockers
+- [ ] **Bulk Stage Updates** - Move multiple journeys to next stage
+
+### Phase 5: Claude CLI Integration
+**Completed:**
+- [x] Add intake refinement prompt (`buildIntakeRefinementPrompt`)
+- [x] Add spec generation prompt (`buildSpecGenerationPrompt`)
+- [x] Add plan generation prompt (`buildPlanGenerationPrompt`)
+- [x] IPC handlers for all AI operations
+- [x] Preload API exposure for renderer
+
+**Pending:**
+- [ ] Wire up AI refinement in intake editor UI
+- [ ] Wire up spec generation in spec tab UI
+- [ ] Wire up plan generation in plan tab UI
+- [ ] Add loading states/spinners for AI operations
+- [ ] Add error handling UI for failed AI calls
+- [ ] Streaming response support (show AI output as it generates)
+
+### Phase 6: Session & Process Management (Future)
+- [ ] Start/stop dev server processes per target
+- [ ] Port allocation per worktree
+- [ ] Process health monitoring
+- [ ] Auto-restart crashed processes
+- [ ] Terminal output capture
+
+### Phase 7: Git Worktree Integration (Future)
+- [ ] Create worktree on journey start
+- [ ] Delete worktree on journey delete
+- [ ] Worktree status display
+- [ ] Branch conflict detection
 
 ---
 

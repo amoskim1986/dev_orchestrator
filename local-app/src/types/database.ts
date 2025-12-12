@@ -1,3 +1,6 @@
+// Re-export Database type from shared or define here
+// This file exists for Supabase client type inference
+
 import type {
   Project,
   ProjectInsert,
@@ -33,7 +36,7 @@ import type {
   SessionAiTool,
   SessionAiToolInsert,
   SessionAiToolUpdate,
-} from './index';
+} from '@dev-orchestrator/shared';
 
 export interface Database {
   public: {

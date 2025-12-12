@@ -7,6 +7,14 @@ import {
   JourneySummary,
 } from '../services/claude-cli/types';
 import {
+  // New intake/spec/plan prompts
+  buildIntakeRefinementPrompt,
+  buildSpecGenerationPrompt,
+  buildPlanGenerationPrompt,
+  REFINED_INTAKE_SCHEMA,
+  SPEC_SCHEMA,
+  PLAN_SCHEMA,
+  // Legacy prompts
   buildJourneyAnalysisPrompt,
   buildImplementationPlanPrompt,
   buildJourneySummaryPrompt,
@@ -14,6 +22,68 @@ import {
   IMPLEMENTATION_PLAN_SCHEMA,
   JOURNEY_SUMMARY_SCHEMA,
 } from '../services/claude-cli/prompts';
+
+// Response types for new prompts
+export interface RefinedIntake {
+  title: string;
+  problem: string;
+  proposedSolution: string;
+  userStories: string[];
+  acceptanceCriteria: string[];
+  outOfScope: string[];
+  openQuestions: string[];
+}
+
+export interface Spec {
+  overview: string;
+  goals: string[];
+  nonGoals: string[];
+  technicalApproach: {
+    summary: string;
+    components: { name: string; purpose: string; changes: string }[];
+  };
+  dataModel: {
+    newEntities: { name: string; fields: string[] }[];
+    modifiedEntities: { name: string; changes: string }[];
+  };
+  apiChanges: {
+    newEndpoints: { method: string; path: string; purpose: string }[];
+    modifiedEndpoints: { method: string; path: string; changes: string }[];
+  };
+  uiChanges: {
+    newScreens: { name: string; purpose: string }[];
+    modifiedScreens: { name: string; changes: string }[];
+  };
+  testing: {
+    unitTests: string[];
+    integrationTests: string[];
+    e2eTests: string[];
+  };
+  rollout: {
+    featureFlags: string[];
+    migrationSteps: string[];
+    rollbackPlan: string;
+  };
+  openQuestions: string[];
+}
+
+export interface Plan {
+  summary: string;
+  estimatedEffort: 'small' | 'medium' | 'large' | 'x-large';
+  phases: {
+    name: string;
+    description: string;
+    tasks: {
+      title: string;
+      description: string;
+      estimatedHours: number;
+      dependencies: string[];
+      deliverables: string[];
+    }[];
+  }[];
+  risks: { risk: string; mitigation: string; severity: 'low' | 'medium' | 'high' }[];
+  milestones: { name: string; criteria: string }[];
+}
 
 export function registerClaudeCliIpc() {
   const service = getClaudeCliService();
@@ -37,6 +107,72 @@ export function registerClaudeCliIpc() {
     }
   );
 
+  // =============================================================================
+  // NEW: Intake/Spec/Plan workflow
+  // =============================================================================
+
+  // Refine raw intake into structured format
+  ipcMain.handle(
+    'claude:refineIntake',
+    async (
+      _event,
+      {
+        rawIntake,
+        journeyType,
+        projectContext,
+      }: {
+        rawIntake: string;
+        journeyType: 'feature_planning' | 'feature' | 'bug' | 'investigation';
+        projectContext?: string;
+      }
+    ) => {
+      const prompt = buildIntakeRefinementPrompt(rawIntake, journeyType, projectContext);
+      return service.queryJson<RefinedIntake>(prompt, REFINED_INTAKE_SCHEMA);
+    }
+  );
+
+  // Generate spec from refined intake
+  ipcMain.handle(
+    'claude:generateSpec',
+    async (
+      _event,
+      {
+        refinedIntake,
+        projectContext,
+        techStack,
+      }: {
+        refinedIntake: string;
+        projectContext?: string;
+        techStack?: string;
+      }
+    ) => {
+      const prompt = buildSpecGenerationPrompt(refinedIntake, projectContext, techStack);
+      return service.queryJson<Spec>(prompt, SPEC_SCHEMA);
+    }
+  );
+
+  // Generate implementation plan from spec
+  ipcMain.handle(
+    'claude:generatePlan',
+    async (
+      _event,
+      {
+        spec,
+        projectContext,
+      }: {
+        spec: string;
+        projectContext?: string;
+      }
+    ) => {
+      const prompt = buildPlanGenerationPrompt(spec, projectContext);
+      return service.queryJson<Plan>(prompt, PLAN_SCHEMA);
+    }
+  );
+
+  // =============================================================================
+  // LEGACY: Pre-built journey operations
+  // =============================================================================
+
   // Pre-built: Analyze a journey idea
   ipcMain.handle(
     'claude:analyzeJourney',
@@ -46,7 +182,7 @@ export function registerClaudeCliIpc() {
     }
   );
 
-  // Pre-built: Create implementation plan
+  // Pre-built: Create implementation plan (legacy)
   ipcMain.handle(
     'claude:createPlan',
     async (

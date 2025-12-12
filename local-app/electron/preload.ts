@@ -19,20 +19,16 @@ interface ClaudeSession {
   firstMessage: string
 }
 
+type MessageContent =
+  | { type: 'text'; text: string }
+  | { type: 'tool_use'; id: string; name: string; input?: Record<string, unknown> }
+  | { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean }
+
 interface ClaudeMessage {
   uuid?: string
   type: 'user' | 'assistant' | 'tool_result'
   timestamp: Date
-  content: Array<{
-    type: string
-    text?: string
-    name?: string
-    id?: string
-    input?: Record<string, unknown>
-    tool_use_id?: string
-    content?: string
-    is_error?: boolean
-  }>
+  content: MessageContent[]
   model?: string
   toolUseResult?: {
     durationMs?: number
@@ -91,6 +87,70 @@ interface JourneySummary {
   nextSteps: string[]
 }
 
+// New intake/spec/plan types
+interface RefinedIntake {
+  title: string
+  problem: string
+  proposedSolution: string
+  userStories: string[]
+  acceptanceCriteria: string[]
+  outOfScope: string[]
+  openQuestions: string[]
+}
+
+interface Spec {
+  overview: string
+  goals: string[]
+  nonGoals: string[]
+  technicalApproach: {
+    summary: string
+    components: { name: string; purpose: string; changes: string }[]
+  }
+  dataModel: {
+    newEntities: { name: string; fields: string[] }[]
+    modifiedEntities: { name: string; changes: string }[]
+  }
+  apiChanges: {
+    newEndpoints: { method: string; path: string; purpose: string }[]
+    modifiedEndpoints: { method: string; path: string; changes: string }[]
+  }
+  uiChanges: {
+    newScreens: { name: string; purpose: string }[]
+    modifiedScreens: { name: string; changes: string }[]
+  }
+  testing: {
+    unitTests: string[]
+    integrationTests: string[]
+    e2eTests: string[]
+  }
+  rollout: {
+    featureFlags: string[]
+    migrationSteps: string[]
+    rollbackPlan: string
+  }
+  openQuestions: string[]
+}
+
+interface Plan {
+  summary: string
+  estimatedEffort: 'small' | 'medium' | 'large' | 'x-large'
+  phases: {
+    name: string
+    description: string
+    tasks: {
+      title: string
+      description: string
+      estimatedHours: number
+      dependencies: string[]
+      deliverables: string[]
+    }[]
+  }[]
+  risks: { risk: string; mitigation: string; severity: 'low' | 'medium' | 'high' }[]
+  milestones: { name: string; criteria: string }[]
+}
+
+type JourneyType = 'feature_planning' | 'feature' | 'bug' | 'investigation'
+
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -123,6 +183,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     query: (request: ClaudeCliRequest) => ipcRenderer.invoke('claude:query', request),
     queryJson: <T>(prompt: string, jsonSchema: string, options?: Partial<ClaudeCliRequest>) =>
       ipcRenderer.invoke('claude:queryJson', { prompt, jsonSchema, options }) as Promise<ClaudeCliResponse<T>>,
+    // New intake/spec/plan workflow
+    refineIntake: (rawIntake: string, journeyType: JourneyType, projectContext?: string) =>
+      ipcRenderer.invoke('claude:refineIntake', { rawIntake, journeyType, projectContext }) as Promise<ClaudeCliResponse<RefinedIntake>>,
+    generateSpec: (refinedIntake: string, projectContext?: string, techStack?: string) =>
+      ipcRenderer.invoke('claude:generateSpec', { refinedIntake, projectContext, techStack }) as Promise<ClaudeCliResponse<Spec>>,
+    generatePlan: (spec: string, projectContext?: string) =>
+      ipcRenderer.invoke('claude:generatePlan', { spec, projectContext }) as Promise<ClaudeCliResponse<Plan>>,
+    // Legacy methods
     analyzeJourney: (description: string, projectContext?: string) =>
       ipcRenderer.invoke('claude:analyzeJourney', { description, projectContext }) as Promise<ClaudeCliResponse<JourneyAnalysis>>,
     createPlan: (featureDescription: string, techStack: string, existingStructure?: string) =>
@@ -156,6 +224,11 @@ declare global {
       claude: {
         query: (request: ClaudeCliRequest) => Promise<ClaudeCliResponse>
         queryJson: <T>(prompt: string, jsonSchema: string, options?: Partial<ClaudeCliRequest>) => Promise<ClaudeCliResponse<T>>
+        // New intake/spec/plan workflow
+        refineIntake: (rawIntake: string, journeyType: JourneyType, projectContext?: string) => Promise<ClaudeCliResponse<RefinedIntake>>
+        generateSpec: (refinedIntake: string, projectContext?: string, techStack?: string) => Promise<ClaudeCliResponse<Spec>>
+        generatePlan: (spec: string, projectContext?: string) => Promise<ClaudeCliResponse<Plan>>
+        // Legacy methods
         analyzeJourney: (description: string, projectContext?: string) => Promise<ClaudeCliResponse<JourneyAnalysis>>
         createPlan: (featureDescription: string, techStack: string, existingStructure?: string) => Promise<ClaudeCliResponse<ImplementationPlan>>
         summarizeJourney: (journeyName: string, gitDiff: string, commitHistory: string, originalPlan?: string) => Promise<ClaudeCliResponse<JourneySummary>>

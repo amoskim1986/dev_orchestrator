@@ -19,7 +19,8 @@ let mainWindow: BrowserWindow | null = null
 
 function createWindow() {
   // Use VITE_DEV_SERVER_URL env var set by electron-vite
-  const devServerUrl = process.env.VITE_DEV_SERVER_URL
+  // In development, electron-vite should set this, but as fallback use !app.isPackaged
+  const devServerUrl = process.env.VITE_DEV_SERVER_URL || (!app.isPackaged ? 'http://localhost:3010' : undefined)
 
   mainWindow = new BrowserWindow({
     width: 1400,

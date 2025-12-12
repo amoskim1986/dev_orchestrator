@@ -21,6 +21,14 @@ export type {
 export { DEFAULT_CONFIG } from './types';
 
 export {
+  // New intake/spec/plan prompts
+  buildIntakeRefinementPrompt,
+  buildSpecGenerationPrompt,
+  buildPlanGenerationPrompt,
+  REFINED_INTAKE_SCHEMA,
+  SPEC_SCHEMA,
+  PLAN_SCHEMA,
+  // Legacy prompts
   buildJourneyAnalysisPrompt,
   buildImplementationPlanPrompt,
   buildJourneySummaryPrompt,

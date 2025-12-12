@@ -1,5 +1,6 @@
 export { JourneysTab } from './JourneysTab'
-export { JourneyBoard } from './JourneyBoard'
 export { JourneyCard } from './JourneyCard'
-export { StatusBadge } from './StatusBadge'
+export { JourneyDetailPanel } from './JourneyDetailPanel'
+export { TypeBadge } from './TypeBadge'
+export { StageBadge, StageProgress } from './StageBadge'
 export { AddJourneyModal } from './AddJourneyModal'

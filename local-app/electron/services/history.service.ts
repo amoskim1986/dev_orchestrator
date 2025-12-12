@@ -114,12 +114,6 @@ class ClaudeHistoryService {
     return basicDecode
   }
 
-  private encodePath(fullPath: string): string {
-    // Convert /Users/amoskim/Desktop/... to -Users-amoskim-Desktop-...
-    // Real hyphens in path become --
-    return '-' + fullPath.replace(/-/g, '--').replace(/\//g, '-')
-  }
-
   async getProjects(): Promise<ClaudeProject[]> {
     const projectsDir = path.join(this.claudeDir, 'projects')
 

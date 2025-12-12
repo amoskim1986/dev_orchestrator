@@ -7,7 +7,7 @@ import type { ProjectInsert } from '../../types'
 interface AddProjectModalProps {
   isOpen: boolean
   onClose: () => void
-  onSubmit: (project: ProjectInsert) => Promise<void>
+  onSubmit: (project: ProjectInsert) => Promise<unknown>
 }
 
 export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalProps) {

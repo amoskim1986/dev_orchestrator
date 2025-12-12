@@ -69,7 +69,7 @@ export function useJourneys(projectId?: string) {
     setJourneys(prev => prev.filter(j => j.id !== id));
   }, []);
 
-  // Start a journey: sets branch_name, worktree_path, and status
+  // Start a journey: sets branch_name and worktree_path
   const startJourney = useCallback(async (
     id: string,
     branchName: string,
@@ -78,7 +78,6 @@ export function useJourneys(projectId?: string) {
     return updateJourney(id, {
       branch_name: branchName,
       worktree_path: worktreePath,
-      status: 'in_progress',
     });
   }, [updateJourney]);
 
