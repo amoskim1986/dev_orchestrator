@@ -7,6 +7,14 @@ import { registerClaudeCliIpc } from './ipc/claude-cli.ipc'
 // Set app name for macOS menu bar and dock
 app.name = 'Dev Orchestrator'
 
+// Ensure only one instance of the app runs at a time
+const gotTheLock = app.requestSingleInstanceLock()
+
+if (!gotTheLock) {
+  // Another instance is already running - quit this one
+  app.quit()
+}
+
 let mainWindow: BrowserWindow | null = null
 
 function createWindow() {
@@ -41,6 +49,14 @@ function createWindow() {
     mainWindow = null
   })
 }
+
+// Focus existing window when second instance tries to launch
+app.on('second-instance', () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.focus()
+  }
+})
 
 app.whenReady().then(async () => {
   // Set dock icon on macOS

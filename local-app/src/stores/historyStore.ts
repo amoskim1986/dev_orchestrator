@@ -22,6 +22,7 @@ interface HistoryState {
   selectProject: (projectId: string | null) => void
   selectSession: (session: ClaudeSession | null) => void
   openTerminal: (cwd: string, launchClaude?: boolean, sessionId?: string) => Promise<string | null>
+  openSessionInFinder: (filePath: string) => Promise<void>
 }
 
 export const useHistoryStore = create<HistoryState>((set, get) => ({
@@ -115,6 +116,15 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
     } catch (err) {
       set({ error: (err as Error).message })
       return null
+    }
+  },
+
+  // Open session file in Finder
+  openSessionInFinder: async (filePath: string) => {
+    try {
+      await window.electronAPI.history.openInFinder(filePath)
+    } catch (err) {
+      set({ error: (err as Error).message })
     }
   },
 }))

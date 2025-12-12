@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { ipcMain, shell } from 'electron'
 import { historyService } from '../services/history.service'
 
 export function registerHistoryIpc() {
@@ -12,5 +12,9 @@ export function registerHistoryIpc() {
 
   ipcMain.handle('history:getMessages', async (_event, filePath: string) => {
     return historyService.getSessionMessages(filePath)
+  })
+
+  ipcMain.handle('history:openInFinder', async (_event, filePath: string) => {
+    shell.showItemInFolder(filePath)
   })
 }

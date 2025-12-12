@@ -88,6 +88,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getProjects: () => ipcRenderer.invoke('history:getProjects'),
     getSessions: (projectId: string) => ipcRenderer.invoke('history:getSessions', projectId),
     getMessages: (filePath: string) => ipcRenderer.invoke('history:getMessages', filePath),
+    openInFinder: (filePath: string) => ipcRenderer.invoke('history:openInFinder', filePath),
   },
 
   // Terminal API
@@ -128,6 +129,7 @@ declare global {
         getProjects: () => Promise<ClaudeProject[]>
         getSessions: (projectId: string) => Promise<ClaudeSession[]>
         getMessages: (filePath: string) => Promise<ClaudeMessage[]>
+        openInFinder: (filePath: string) => Promise<void>
       }
       terminal: {
         open: (options: { cwd: string; title?: string; launchClaude?: boolean; sessionId?: string; initialPrompt?: string }) => Promise<string>
