@@ -196,11 +196,66 @@ interface ProjectIntakeUpdate {
   updated_document: string
 }
 
+// Git types
+interface GitWorktree {
+  path: string
+  branch: string
+  commit: string
+  isMain: boolean
+}
+
+interface GitStatus {
+  branch: string
+  ahead: number
+  behind: number
+  isClean: boolean
+  modified: number
+  staged: number
+  untracked: number
+}
+
+interface CreateWorktreeResult {
+  success: boolean
+  worktreePath: string
+  branchName: string
+  error?: string
+}
+
+interface RemoveWorktreeResult {
+  success: boolean
+  error?: string
+}
+
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
   // Platform info
   platform: process.platform,
+
+  // Project Detail Window API
+  projectDetail: {
+    onInit: (callback: (data: { projectId: string }) => void) => {
+      ipcRenderer.on('projectDetail:init', (_event, data) => callback(data))
+    },
+    open: (projectId: string) => ipcRenderer.invoke('projectDetail:open', projectId),
+  },
+
+  // Journey Detail Window API
+  journeyDetail: {
+    onInit: (callback: (data: { journeyId: string; projectId: string }) => void) => {
+      ipcRenderer.on('journeyDetail:init', (_event, data) => callback(data))
+    },
+    onAddTab: (callback: (data: { journeyId: string; projectId: string }) => void) => {
+      ipcRenderer.on('journeyDetail:addTab', (_event, data) => callback(data))
+    },
+    onFocusTab: (callback: (data: { journeyId: string }) => void) => {
+      ipcRenderer.on('journeyDetail:focusTab', (_event, data) => callback(data))
+    },
+    open: (journeyId: string, projectId: string) =>
+      ipcRenderer.invoke('journeyDetail:open', journeyId, projectId),
+    closeTab: (journeyId: string) =>
+      ipcRenderer.invoke('journeyDetail:closeTab', journeyId),
+  },
 
   // History API
   history: {
@@ -265,6 +320,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ) =>
       ipcRenderer.invoke('vscode:generatePrompt', { type, context, lastActivity }) as Promise<string>,
   },
+
+  // Git API - Worktree management for journeys
+  git: {
+    isRepo: (projectPath: string) =>
+      ipcRenderer.invoke('git:isRepo', projectPath) as Promise<boolean>,
+    getDefaultBranch: (projectPath: string) =>
+      ipcRenderer.invoke('git:getDefaultBranch', projectPath) as Promise<string>,
+    listWorktrees: (projectPath: string) =>
+      ipcRenderer.invoke('git:listWorktrees', projectPath) as Promise<GitWorktree[]>,
+    createWorktree: (options: { projectPath: string; journeyName: string }) =>
+      ipcRenderer.invoke('git:createWorktree', options) as Promise<CreateWorktreeResult>,
+    removeWorktree: (options: { projectPath: string; worktreePath: string }) =>
+      ipcRenderer.invoke('git:removeWorktree', options) as Promise<RemoveWorktreeResult>,
+    getStatus: (worktreePath: string) =>
+      ipcRenderer.invoke('git:getStatus', worktreePath) as Promise<GitStatus | null>,
+    getCurrentBranch: (worktreePath: string) =>
+      ipcRenderer.invoke('git:getCurrentBranch', worktreePath) as Promise<string | null>,
+  },
 })
 
 // Type definitions for the exposed API
@@ -272,6 +345,17 @@ declare global {
   interface Window {
     electronAPI: {
       platform: NodeJS.Platform
+      projectDetail: {
+        onInit: (callback: (data: { projectId: string }) => void) => void
+        open: (projectId: string) => Promise<string>
+      }
+      journeyDetail: {
+        onInit: (callback: (data: { journeyId: string; projectId: string }) => void) => void
+        onAddTab: (callback: (data: { journeyId: string; projectId: string }) => void) => void
+        onFocusTab: (callback: (data: { journeyId: string }) => void) => void
+        open: (journeyId: string, projectId: string) => Promise<void>
+        closeTab: (journeyId: string) => Promise<void>
+      }
       history: {
         getProjects: () => Promise<ClaudeProject[]>
         getSessions: (projectId: string) => Promise<ClaudeSession[]>
@@ -312,6 +396,15 @@ declare global {
           context: JourneyLaunchRequest,
           lastActivity?: string
         ) => Promise<string>
+      }
+      git: {
+        isRepo: (projectPath: string) => Promise<boolean>
+        getDefaultBranch: (projectPath: string) => Promise<string>
+        listWorktrees: (projectPath: string) => Promise<GitWorktree[]>
+        createWorktree: (options: { projectPath: string; journeyName: string }) => Promise<CreateWorktreeResult>
+        removeWorktree: (options: { projectPath: string; worktreePath: string }) => Promise<RemoveWorktreeResult>
+        getStatus: (worktreePath: string) => Promise<GitStatus | null>
+        getCurrentBranch: (worktreePath: string) => Promise<string | null>
       }
     }
   }

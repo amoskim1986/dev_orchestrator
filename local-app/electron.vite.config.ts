@@ -37,7 +37,9 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'index.html'),
-          terminal: resolve(__dirname, 'terminal.html')
+          terminal: resolve(__dirname, 'terminal.html'),
+          'project-detail': resolve(__dirname, 'project-detail.html'),
+          'journey-detail': resolve(__dirname, 'journey-detail.html')
         }
       }
     },

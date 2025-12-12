@@ -4,6 +4,24 @@ import { registerHistoryIpc } from './ipc/history.ipc'
 import { registerDialogIpc } from './ipc/dialog.ipc'
 import { registerClaudeCliIpc } from './ipc/claude-cli.ipc'
 import { registerVSCodeLauncherIpc } from './ipc/vscode-launcher.ipc'
+import { registerGitIpc } from './ipc/git.ipc'
+import { registerProjectDetailIpc } from './ipc/project-detail.ipc'
+import { registerJourneyDetailIpc } from './ipc/journey-detail.ipc'
+
+// Handle uncaught exceptions gracefully (e.g., EPIPE from child processes)
+process.on('uncaughtException', (error) => {
+  // EPIPE errors from child processes are non-fatal - just log them
+  if ((error as NodeJS.ErrnoException).code === 'EPIPE') {
+    console.warn('EPIPE error (non-fatal):', error.message)
+    return
+  }
+  // Log other errors but don't crash
+  console.error('Uncaught exception:', error)
+})
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled rejection at:', promise, 'reason:', reason)
+})
 
 // Set app name for macOS menu bar and dock
 app.name = 'Dev Orchestrator'
@@ -71,6 +89,9 @@ app.whenReady().then(async () => {
   registerDialogIpc()
   registerClaudeCliIpc()
   registerVSCodeLauncherIpc()
+  registerGitIpc()
+  registerProjectDetailIpc()
+  registerJourneyDetailIpc()
 
   // Dynamically import terminal IPC to avoid app.isPackaged at module load time
   const { registerTerminalIpc } = await import('./ipc/terminal.ipc')
@@ -94,5 +115,9 @@ app.on('window-all-closed', () => {
 // Cleanup on quit
 app.on('before-quit', async () => {
   const { terminalWindowManager } = await import('./services/terminal-window')
+  const { projectDetailWindowManager } = await import('./services/project-detail-window')
+  const { journeyDetailWindowManager } = await import('./services/journey-detail-window')
   terminalWindowManager.closeAll()
+  projectDetailWindowManager.closeAll()
+  journeyDetailWindowManager.closeAll()
 })

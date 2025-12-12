@@ -1,13 +1,14 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useProjects } from '../../hooks/useProjects'
 import { useJourneys } from '../../hooks/useJourneys'
-import { JourneyDetailPanel } from './JourneyDetailPanel'
 import { JourneyCard } from './JourneyCard'
 import { Button } from '../common/Button'
 import { Input } from '../common/Input'
 import { ToastContainer, ToastData } from '../common/Toast'
-import type { Project, Journey, JourneyStage, JourneyType, JourneyUpdate } from '../../types'
+import type { Journey, JourneyStage, JourneyType } from '../../types'
 import { getStagesForType, getInitialStage } from '@dev-orchestrator/shared'
+
+const STORAGE_KEY_LAST_PROJECT = 'dev-orchestrator:last-project-id'
 
 // Journey type configuration
 const journeyTypeConfig: Record<JourneyType, { icon: string; label: string; description: string }> = {
@@ -108,15 +109,30 @@ function QuickIntakeForm({
 
 export function JourneysTab() {
   const { projects, loading: projectsLoading } = useProjects()
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() => {
+    // Restore last selected project from localStorage
+    return localStorage.getItem(STORAGE_KEY_LAST_PROJECT)
+  })
 
-  // Auto-select first project when projects load
-  const selectedProject = projects.find(p => p.id === selectedProjectId) || projects[0] || null
+  // Auto-select: prioritize stored project, then fall back to first project
+  const selectedProject = useMemo(() => {
+    if (selectedProjectId) {
+      const found = projects.find(p => p.id === selectedProjectId)
+      if (found) return found
+    }
+    return projects[0] || null
+  }, [projects, selectedProjectId])
+
+  // Persist selected project to localStorage
+  useEffect(() => {
+    if (selectedProject?.id) {
+      localStorage.setItem(STORAGE_KEY_LAST_PROJECT, selectedProject.id)
+    }
+  }, [selectedProject?.id])
 
   const { journeys, loading, error, createJourney, updateJourney, deleteJourney, startJourney } = useJourneys(selectedProject?.id)
   const [activeType, setActiveType] = useState<JourneyType>('feature_planning')
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
-  const [selectedJourney, setSelectedJourney] = useState<Journey | null>(null)
   const [isCreating, setIsCreating] = useState(false)
   const [toasts, setToasts] = useState<ToastData[]>([])
 
@@ -154,34 +170,71 @@ export function JourneysTab() {
   const handleStart = async (journey: Journey) => {
     if (!selectedProject) return
 
-    const branchName = `journey/${generateBranchName(journey.name)}`
-    const worktreePath = `${selectedProject.root_path}/.worktrees/${generateBranchName(journey.name)}`
-
     try {
-      await startJourney(journey.id, branchName, worktreePath)
+      // First check if this is a git repo
+      const isRepo = await window.electronAPI.git.isRepo(selectedProject.root_path)
+      if (!isRepo) {
+        showToast('Project folder is not a git repository', 'error')
+        return
+      }
+
+      // Create the git worktree
+      const result = await window.electronAPI.git.createWorktree({
+        projectPath: selectedProject.root_path,
+        journeyName: journey.name,
+      })
+
+      if (!result.success) {
+        showToast(result.error || 'Failed to create worktree', 'error')
+        return
+      }
+
+      // Update the journey with the worktree info
+      await startJourney(journey.id, result.branchName, result.worktreePath)
+      showToast(`Started journey on branch: ${result.branchName}`, 'success')
     } catch (err) {
       console.error('Failed to start journey:', err)
+      showToast(err instanceof Error ? err.message : 'Failed to start journey', 'error')
     }
   }
 
   const handleDelete = async (id: string) => {
     try {
-      await deleteJourney(id)
-      if (selectedJourney?.id === id) {
-        setSelectedJourney(null)
+      // Find the journey to check if it has a worktree
+      const journey = journeys.find(j => j.id === id)
+
+      // If the journey has a worktree, try to remove it first
+      if (journey?.worktree_path && selectedProject) {
+        try {
+          const result = await window.electronAPI.git.removeWorktree({
+            projectPath: selectedProject.root_path,
+            worktreePath: journey.worktree_path,
+          })
+          if (!result.success) {
+            console.warn('Failed to remove worktree:', result.error)
+            // Continue with deletion even if worktree removal fails
+          }
+        } catch (err) {
+          console.warn('Error removing worktree:', err)
+          // Continue with deletion even if worktree removal fails
+        }
       }
+
+      await deleteJourney(id)
+      showToast('Journey deleted', 'success')
     } catch (err) {
       console.error('Failed to delete journey:', err)
+      showToast(err instanceof Error ? err.message : 'Failed to delete journey', 'error')
     }
     setDeleteConfirm(null)
   }
 
-  const handleUpdateJourney = async (id: string, updates: JourneyUpdate) => {
-    const updated = await updateJourney(id, updates)
-    if (selectedJourney?.id === id && updated) {
-      setSelectedJourney(updated)
+  const handleOpenJourneyDetail = useCallback((journey: Journey) => {
+    if (!selectedProject) return
+    if (window.electronAPI?.journeyDetail?.open) {
+      window.electronAPI.journeyDetail.open(journey.id, selectedProject.id)
     }
-  }
+  }, [selectedProject])
 
   const handleOpenClaudeCode = async (journey: Journey) => {
     const workingDir = journey.worktree_path || selectedProject?.root_path
@@ -239,11 +292,6 @@ export function JourneysTab() {
       setIsCreating(false)
     }
   }
-
-  // Keep selected journey in sync
-  const currentSelectedJourney = selectedJourney
-    ? journeys.find(j => j.id === selectedJourney.id) || null
-    : null
 
   // Loading state
   if (projectsLoading) {
@@ -325,7 +373,7 @@ export function JourneysTab() {
       </div>
 
       {/* Content Area */}
-      <div className={`flex-1 flex flex-col overflow-hidden p-4 transition-all ${currentSelectedJourney ? 'mr-[480px]' : ''}`}>
+      <div className="flex-1 flex flex-col overflow-hidden p-4">
         {/* Loading/Error states for journeys */}
         {loading ? (
           <div className="flex-1 flex items-center justify-center">
@@ -361,7 +409,7 @@ export function JourneysTab() {
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="flex flex-col gap-2">
                   {filteredJourneys.map(journey => (
                     <JourneyCard
                       key={journey.id}
@@ -369,7 +417,7 @@ export function JourneysTab() {
                       onUpdateStage={(stage) => handleUpdateStage(journey.id, stage)}
                       onStart={() => handleStart(journey)}
                       onDelete={() => setDeleteConfirm(journey.id)}
-                      onClick={() => setSelectedJourney(journey)}
+                      onClick={() => handleOpenJourneyDetail(journey)}
                       onOpenInVSCode={() => handleOpenInVSCode(journey)}
                     />
                   ))}
@@ -399,20 +447,6 @@ export function JourneysTab() {
             </div>
           </div>
         </div>
-      )}
-
-      {/* Journey Detail Panel */}
-      {currentSelectedJourney && (
-        <JourneyDetailPanel
-          journey={currentSelectedJourney}
-          onClose={() => setSelectedJourney(null)}
-          onUpdate={(updates) => handleUpdateJourney(currentSelectedJourney.id, updates)}
-          onOpenClaudeCode={() => handleOpenClaudeCode(currentSelectedJourney)}
-          onDelete={() => {
-            setDeleteConfirm(currentSelectedJourney.id)
-            setSelectedJourney(null)
-          }}
-        />
       )}
 
       {/* Toast Notifications */}
