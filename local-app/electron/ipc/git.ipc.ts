@@ -22,6 +22,13 @@ export function registerGitIpc() {
   })
 
   /**
+   * Initialize a git repository
+   */
+  ipcMain.handle('git:init', async (_event, projectPath: string) => {
+    return gitService.initRepo(projectPath)
+  })
+
+  /**
    * Get the default branch for a project
    */
   ipcMain.handle('git:getDefaultBranch', async (_event, projectPath: string) => {

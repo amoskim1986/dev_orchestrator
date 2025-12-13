@@ -181,31 +181,31 @@ export function ProjectIntakeEditor({ project, onUpdate, onShowChangesDialog }: 
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-white dark:bg-transparent">
       {/* Tabs */}
-      <div className="flex border-b border-gray-700">
+      <div className="flex border-b border-gray-200 dark:border-gray-700">
         <button
           onClick={() => setActiveTab('raw')}
           className={`px-4 py-2 text-sm font-medium transition-colors ${
             activeTab === 'raw'
-              ? 'text-blue-400 border-b-2 border-blue-400'
-              : 'text-gray-400 hover:text-gray-200'
+              ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500 dark:border-blue-400'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
           }`}
         >
           Raw Intake
-          {isDirty && <span className="ml-2 text-yellow-400">*</span>}
+          {isDirty && <span className="ml-2 text-yellow-600 dark:text-yellow-400">*</span>}
         </button>
         <button
           onClick={() => setActiveTab('ai')}
           className={`px-4 py-2 text-sm font-medium transition-colors ${
             activeTab === 'ai'
-              ? 'text-blue-400 border-b-2 border-blue-400'
-              : 'text-gray-400 hover:text-gray-200'
+              ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500 dark:border-blue-400'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
           }`}
         >
           AI Refined
           {project.ai_parsed_at && (
-            <span className="ml-2 text-green-400 text-xs">
+            <span className="ml-2 text-green-600 dark:text-green-400 text-xs">
               (Generated)
             </span>
           )}
@@ -220,10 +220,10 @@ export function ProjectIntakeEditor({ project, onUpdate, onShowChangesDialog }: 
               value={rawContent}
               onChange={(e) => handleRawChange(e.target.value)}
               placeholder="Paste or type your raw project intake here..."
-              className="flex-1 min-h-0 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-mono text-sm"
+              className="flex-1 min-h-0 w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-mono text-sm"
             />
             <div className="flex items-center justify-between">
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-gray-500 dark:text-gray-500">
                 {isDirty ? 'Unsaved changes' : 'No unsaved changes'}
               </div>
               <Button
@@ -236,7 +236,7 @@ export function ProjectIntakeEditor({ project, onUpdate, onShowChangesDialog }: 
           </>
         ) : (
           <>
-            <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+            <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
               <div className="flex items-center gap-3">
                 {project.ai_parsed_at ? (
                   <span>Generated on {formatDate(project.ai_parsed_at)}</span>
@@ -244,13 +244,13 @@ export function ProjectIntakeEditor({ project, onUpdate, onShowChangesDialog }: 
                   <span>No AI-refined version yet</span>
                 )}
                 {/* View/Edit Toggle */}
-                <div className="flex items-center bg-gray-700 rounded-md p-0.5">
+                <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-md p-0.5">
                   <button
                     onClick={() => setAiViewMode('view')}
                     className={`px-2 py-1 rounded text-xs transition-colors ${
                       aiViewMode === 'view'
                         ? 'bg-blue-600 text-white'
-                        : 'text-gray-400 hover:text-white'
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white'
                     }`}
                   >
                     View
@@ -260,7 +260,7 @@ export function ProjectIntakeEditor({ project, onUpdate, onShowChangesDialog }: 
                     className={`px-2 py-1 rounded text-xs transition-colors ${
                       aiViewMode === 'edit'
                         ? 'bg-blue-600 text-white'
-                        : 'text-gray-400 hover:text-white'
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white'
                     }`}
                   >
                     Edit
@@ -277,7 +277,7 @@ export function ProjectIntakeEditor({ project, onUpdate, onShowChangesDialog }: 
               </Button>
             </div>
             {aiViewMode === 'view' ? (
-              <div className="flex-1 min-h-0 w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-md text-white overflow-y-auto prose prose-invert prose-sm max-w-none">
+              <div className="flex-1 min-h-0 w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white overflow-y-auto prose dark:prose-invert prose-sm max-w-none">
                 {aiContent ? (
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {aiContent}
@@ -291,7 +291,7 @@ export function ProjectIntakeEditor({ project, onUpdate, onShowChangesDialog }: 
                 value={aiContent}
                 onChange={(e) => handleAiChange(e.target.value)}
                 placeholder="AI-refined content will appear here..."
-                className="flex-1 min-h-0 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-mono text-sm"
+                className="flex-1 min-h-0 w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-mono text-sm"
               />
             )}
             {aiContent !== project.ai_parsed_intake && (

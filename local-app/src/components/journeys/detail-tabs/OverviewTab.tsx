@@ -188,12 +188,12 @@ export function OverviewTab({ journey, onUpdate }: OverviewTabProps) {
             href={journey.source_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-blue-400 hover:text-blue-300 underline break-all"
+            className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 underline break-all"
           >
             {journey.source_url}
           </a>
         ) : (
-          <p className="text-sm text-gray-500">No source URL</p>
+          <p className="text-sm text-gray-500 dark:text-gray-500">No source URL</p>
         )}
       </div>
 
@@ -215,7 +215,7 @@ export function OverviewTab({ journey, onUpdate }: OverviewTabProps) {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-gray-500">No tags</p>
+          <p className="text-sm text-gray-500 dark:text-gray-500">No tags</p>
         )}
       </div>
 

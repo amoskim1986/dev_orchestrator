@@ -67,7 +67,7 @@ export function ChecklistsTab({ journey }: ChecklistsTabProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-48 text-gray-400">
+      <div className="flex items-center justify-center h-48 text-gray-500 dark:text-gray-400">
         Loading checklists...
       </div>
     )
@@ -75,7 +75,7 @@ export function ChecklistsTab({ journey }: ChecklistsTabProps) {
 
   if (error) {
     return (
-      <div className="text-red-400 p-4">
+      <div className="text-red-600 dark:text-red-400 p-4">
         Error loading checklists: {error.message}
       </div>
     )
@@ -90,19 +90,19 @@ export function ChecklistsTab({ journey }: ChecklistsTabProps) {
         const totalCount = checklist.items.length
 
         return (
-          <div key={checklist.id} className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+          <div key={checklist.id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
             {/* Checklist Header */}
-            <div className="flex items-center justify-between p-3 border-b border-gray-700">
+            <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center gap-3">
-                <h4 className="font-medium text-white">{checklist.leg_name}</h4>
+                <h4 className="font-medium text-gray-900 dark:text-white">{checklist.leg_name}</h4>
                 {checklist.is_active && (
-                  <span className="text-xs bg-green-900/50 text-green-400 px-2 py-0.5 rounded">
+                  <span className="text-xs bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400 px-2 py-0.5 rounded">
                     Active
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-gray-500 dark:text-gray-400">
                   {completedCount}/{totalCount} complete
                 </span>
                 {!checklist.is_active && (
@@ -122,7 +122,7 @@ export function ChecklistsTab({ journey }: ChecklistsTabProps) {
                       deleteChecklist(checklist.id)
                     }
                   }}
-                  className="text-red-400 hover:text-red-300"
+                  className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
                 >
                   Delete
                 </Button>
@@ -130,7 +130,7 @@ export function ChecklistsTab({ journey }: ChecklistsTabProps) {
             </div>
 
             {/* Progress Bar */}
-            <div className="h-1 bg-gray-700">
+            <div className="h-1 bg-gray-200 dark:bg-gray-700">
               <div
                 className="h-full bg-green-500 transition-all duration-300"
                 style={{ width: `${percentage}%` }}
@@ -143,7 +143,7 @@ export function ChecklistsTab({ journey }: ChecklistsTabProps) {
                 <div
                   key={index}
                   className={`flex items-start gap-3 p-2 rounded transition-colors ${
-                    item.done ? 'bg-gray-900/50' : 'hover:bg-gray-700/50'
+                    item.done ? 'bg-gray-100 dark:bg-gray-900/50' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
                   }`}
                 >
                   <button
@@ -151,7 +151,7 @@ export function ChecklistsTab({ journey }: ChecklistsTabProps) {
                     className={`flex-shrink-0 w-5 h-5 rounded border transition-colors ${
                       item.done
                         ? 'bg-green-600 border-green-600 text-white'
-                        : 'border-gray-500 hover:border-gray-400'
+                        : 'border-gray-400 dark:border-gray-500 hover:border-gray-500 dark:hover:border-gray-400'
                     }`}
                   >
                     {item.done && (
@@ -163,7 +163,7 @@ export function ChecklistsTab({ journey }: ChecklistsTabProps) {
                   <span className="text-lg" title={ITEM_TYPE_LABELS[item.type]}>
                     {ITEM_TYPE_ICONS[item.type]}
                   </span>
-                  <span className={`flex-1 text-sm ${item.done ? 'text-gray-500 line-through' : 'text-gray-200'}`}>
+                  <span className={`flex-1 text-sm ${item.done ? 'text-gray-500 line-through' : 'text-gray-700 dark:text-gray-200'}`}>
                     {item.text}
                   </span>
                   {item.done && item.done_at && (
@@ -173,7 +173,7 @@ export function ChecklistsTab({ journey }: ChecklistsTabProps) {
                   )}
                   <button
                     onClick={() => removeItem(checklist.id, index)}
-                    className="text-gray-500 hover:text-red-400 transition-colors"
+                    className="text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-colors"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -190,7 +190,7 @@ export function ChecklistsTab({ journey }: ChecklistsTabProps) {
                     ...prev,
                     [checklist.id]: e.target.value as ChecklistItem['type']
                   }))}
-                  className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-white"
+                  className="bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm text-gray-900 dark:text-white"
                 >
                   <option value="deliverable">📦 Deliverable</option>
                   <option value="test">🧪 Test</option>
@@ -225,17 +225,17 @@ export function ChecklistsTab({ journey }: ChecklistsTabProps) {
 
       {/* Empty State */}
       {checklists.length === 0 && (
-        <div className="flex flex-col items-center justify-center h-48 text-gray-400">
+        <div className="flex flex-col items-center justify-center h-48 text-gray-500 dark:text-gray-400">
           <svg className="w-16 h-16 mb-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
           </svg>
           <p className="text-sm">No checklists yet</p>
-          <p className="text-xs text-gray-500">Create a checklist to track implementation tasks</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">Create a checklist to track implementation tasks</p>
         </div>
       )}
 
       {/* Add Checklist */}
-      <div className="flex items-center gap-2 p-3 bg-gray-800/50 rounded-lg border border-dashed border-gray-600">
+      <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-dashed border-gray-300 dark:border-gray-600">
         <Input
           value={newLegName}
           onChange={(e) => setNewLegName(e.target.value)}

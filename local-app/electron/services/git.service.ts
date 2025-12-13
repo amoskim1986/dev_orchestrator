@@ -89,6 +89,34 @@ class GitService {
   }
 
   /**
+   * Initialize a new git repository
+   */
+  async initRepo(projectPath: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Check if already a git repo
+      if (await this.isGitRepo(projectPath)) {
+        return { success: true } // Already initialized
+      }
+
+      // Check if directory exists
+      if (!fs.existsSync(projectPath)) {
+        return { success: false, error: 'Directory does not exist' }
+      }
+
+      const git = this.getGit(projectPath)
+      await git.init()
+
+      // Create initial commit so branches work
+      await git.raw(['commit', '--allow-empty', '-m', 'Initial commit'])
+
+      return { success: true }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to initialize git repository'
+      return { success: false, error: errorMessage }
+    }
+  }
+
+  /**
    * Get the default branch (main or master)
    */
   async getDefaultBranch(projectPath: string): Promise<string> {

@@ -325,6 +325,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   git: {
     isRepo: (projectPath: string) =>
       ipcRenderer.invoke('git:isRepo', projectPath) as Promise<boolean>,
+    init: (projectPath: string) =>
+      ipcRenderer.invoke('git:init', projectPath) as Promise<{ success: boolean; error?: string }>,
     getDefaultBranch: (projectPath: string) =>
       ipcRenderer.invoke('git:getDefaultBranch', projectPath) as Promise<string>,
     listWorktrees: (projectPath: string) =>
@@ -399,6 +401,7 @@ declare global {
       }
       git: {
         isRepo: (projectPath: string) => Promise<boolean>
+        init: (projectPath: string) => Promise<{ success: boolean; error?: string }>
         getDefaultBranch: (projectPath: string) => Promise<string>
         listWorktrees: (projectPath: string) => Promise<GitWorktree[]>
         createWorktree: (options: { projectPath: string; journeyName: string }) => Promise<CreateWorktreeResult>

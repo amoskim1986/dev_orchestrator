@@ -52,16 +52,16 @@ export function ProjectDetailPage() {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gray-900">
-        <div className="text-gray-400">Loading project...</div>
+      <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-gray-500 dark:text-gray-400">Loading project...</div>
       </div>
     )
   }
 
   if (!project) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gray-900">
-        <div className="text-gray-400">
+      <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-gray-500 dark:text-gray-400">
           {projectId ? 'Project not found' : 'Waiting for project data...'}
         </div>
       </div>
@@ -75,44 +75,44 @@ export function ProjectDetailPage() {
       : 'No Intake'
 
   return (
-    <div className="h-screen flex flex-col bg-gray-900">
+    <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
       {/* Title Bar - draggable area for window */}
       <div
-        className="h-8 bg-gray-800 flex items-center justify-center"
+        className="h-8 bg-gray-100 dark:bg-gray-800 flex items-center justify-center"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
-        <span className="text-xs text-gray-400">Project Details</span>
+        <span className="text-xs text-gray-500 dark:text-gray-400">Project Details</span>
       </div>
 
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700 shrink-0">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
         <div>
-          <h2 className="text-lg font-semibold text-white">{project.name}</h2>
-          <p className="text-xs text-gray-400 mt-0.5">{project.root_path}</p>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{project.name}</h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{project.root_path}</p>
         </div>
         <span className={`text-xs px-2 py-1 rounded ${
           intakeStatus === 'AI Generated'
-            ? 'bg-green-900/50 text-green-400'
+            ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400'
             : intakeStatus === 'Raw Only'
-              ? 'bg-yellow-900/50 text-yellow-400'
-              : 'bg-gray-700 text-gray-400'
+              ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-400'
+              : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
         }`}>
           {intakeStatus}
         </span>
       </div>
 
       {/* Project Info Summary */}
-      <div className="px-4 py-3 border-b border-gray-700 bg-gray-800/50 shrink-0">
+      <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 shrink-0">
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
-            <span className="text-gray-400">Frontend:</span>
-            <span className="ml-2 text-gray-200">
+            <span className="text-gray-500 dark:text-gray-400">Frontend:</span>
+            <span className="ml-2 text-gray-700 dark:text-gray-200">
               {project.frontend_path || '—'}
             </span>
           </div>
           <div>
-            <span className="text-gray-400">Backend:</span>
-            <span className="ml-2 text-gray-200">
+            <span className="text-gray-500 dark:text-gray-400">Backend:</span>
+            <span className="ml-2 text-gray-700 dark:text-gray-200">
               {project.backend_path || '—'}
             </span>
           </div>

@@ -35,7 +35,7 @@ export function SpecTab({ journey }: SpecTabProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-48 text-gray-400">
+      <div className="flex items-center justify-center h-48 text-gray-500 dark:text-gray-400">
         Loading spec...
       </div>
     )
@@ -43,7 +43,7 @@ export function SpecTab({ journey }: SpecTabProps) {
 
   if (error) {
     return (
-      <div className="text-red-400 p-4">
+      <div className="text-red-600 dark:text-red-400 p-4">
         Error loading spec: {error.message}
       </div>
     )
@@ -53,7 +53,7 @@ export function SpecTab({ journey }: SpecTabProps) {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <div className="text-sm text-gray-400">
+        <div className="text-sm text-gray-500 dark:text-gray-400">
           {spec ? `Version ${spec.version} • Last updated: ${new Date(spec.updated_at).toLocaleString()}` : 'No spec yet'}
         </div>
         <Button
@@ -88,7 +88,7 @@ What is this feature/fix about?
 
 ## Technical Notes
 Any technical considerations..."
-        className="flex-1 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-mono text-sm min-h-[300px]"
+        className="flex-1 w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-mono text-sm min-h-[300px]"
       />
 
       {/* Actions */}

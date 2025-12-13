@@ -114,31 +114,31 @@ export function JourneyDetailPage() {
 
   if (tabs.length === 0) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gray-900">
-        <div className="text-gray-400">Waiting for journey data...</div>
+      <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-gray-500 dark:text-gray-400">Waiting for journey data...</div>
       </div>
     )
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-900">
+    <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
       {/* Window Title Bar - draggable */}
       <div
-        className="h-8 bg-gray-800 flex items-center px-20 shrink-0"
+        className="h-8 bg-gray-100 dark:bg-gray-800 flex items-center px-20 shrink-0"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
-        <span className="text-xs text-gray-400">Journey Details</span>
+        <span className="text-xs text-gray-500 dark:text-gray-400">Journey Details</span>
       </div>
 
       {/* Journey Tabs Bar */}
-      <div className="flex items-center border-b border-gray-700 bg-gray-850 shrink-0 overflow-x-auto">
+      <div className="flex items-center border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-850 shrink-0 overflow-x-auto">
         {tabs.map(tab => (
           <div
             key={tab.journeyId}
-            className={`flex items-center gap-2 px-4 py-2 border-r border-gray-700 cursor-pointer transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2 border-r border-gray-200 dark:border-gray-700 cursor-pointer transition-colors ${
               activeTabId === tab.journeyId
-                ? 'bg-gray-800 text-white'
-                : 'bg-gray-900 text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
+                ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                : 'bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 hover:text-gray-700 dark:hover:text-gray-200'
             }`}
             onClick={() => setActiveTabId(tab.journeyId)}
           >
@@ -150,7 +150,7 @@ export function JourneyDetailPage() {
                 e.stopPropagation()
                 handleCloseTab(tab.journeyId)
               }}
-              className="text-gray-500 hover:text-white transition-colors p-0.5 rounded hover:bg-gray-700"
+              className="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white transition-colors p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -163,23 +163,23 @@ export function JourneyDetailPage() {
       {/* Journey Content */}
       {loading ? (
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-gray-400">Loading journey...</div>
+          <div className="text-gray-500 dark:text-gray-400">Loading journey...</div>
         </div>
       ) : !activeJourney ? (
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-gray-400">Journey not found</div>
+          <div className="text-gray-500 dark:text-gray-400">Journey not found</div>
         </div>
       ) : (
         <>
           {/* Journey Header */}
-          <div className="flex items-start justify-between p-4 border-b border-gray-700 shrink-0">
+          <div className="flex items-start justify-between p-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
             <div className="flex-1 min-w-0 pr-4">
-              <h2 className="text-lg font-semibold text-white truncate">{activeJourney.name}</h2>
-              <p className="text-sm text-gray-400 mt-1">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white truncate">{activeJourney.name}</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 {activeJourney.type.replace('_', ' ')} &bull; {activeJourney.stage.replace(/_/g, ' ')}
               </p>
               {activeJourney.branch_name && (
-                <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-400">
+                <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-500 dark:text-gray-400">
                   <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
                     <path fillRule="evenodd" d="M11.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122V6A2.5 2.5 0 0110 8.5H6a1 1 0 00-1 1v1.128a2.251 2.251 0 11-1.5 0V5.372a2.25 2.25 0 111.5 0v1.836A2.492 2.492 0 016 7h4a1 1 0 001-1v-.628A2.25 2.25 0 019.5 3.25zM4.25 12a.75.75 0 100 1.5.75.75 0 000-1.5zM3.5 3.25a.75.75 0 111.5 0 .75.75 0 01-1.5 0z"/>
                   </svg>
@@ -198,7 +198,7 @@ export function JourneyDetailPage() {
           </div>
 
           {/* Actions Footer */}
-          <div className="border-t border-gray-700 p-4 shrink-0">
+          <div className="border-t border-gray-200 dark:border-gray-700 p-4 shrink-0">
             <div className="flex gap-2">
               <Button variant="secondary" className="flex-1">
                 <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">

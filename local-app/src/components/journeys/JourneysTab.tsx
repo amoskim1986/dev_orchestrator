@@ -10,6 +10,12 @@ import { getStagesForType, getInitialStage } from '@dev-orchestrator/shared'
 
 const STORAGE_KEY_LAST_PROJECT = 'dev-orchestrator:last-project-id'
 
+// Git status for project
+interface ProjectGitStatus {
+  isRepo: boolean
+  checking: boolean
+}
+
 // Journey type configuration
 const journeyTypeConfig: Record<JourneyType, { icon: string; label: string; description: string }> = {
   feature_planning: {
@@ -134,6 +140,31 @@ export function JourneysTab() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
   const [toasts, setToasts] = useState<ToastData[]>([])
+  const [gitStatus, setGitStatus] = useState<ProjectGitStatus>({ isRepo: true, checking: true })
+  const [isInitializingGit, setIsInitializingGit] = useState(false)
+
+  // Check git status when project changes
+  useEffect(() => {
+    if (!selectedProject?.root_path) {
+      setGitStatus({ isRepo: true, checking: false })
+      return
+    }
+
+    let cancelled = false
+    setGitStatus({ isRepo: true, checking: true })
+
+    window.electronAPI.git.isRepo(selectedProject.root_path).then((isRepo) => {
+      if (!cancelled) {
+        setGitStatus({ isRepo, checking: false })
+      }
+    }).catch(() => {
+      if (!cancelled) {
+        setGitStatus({ isRepo: false, checking: false })
+      }
+    })
+
+    return () => { cancelled = true }
+  }, [selectedProject?.root_path])
 
   // Toast helpers
   const showToast = useCallback((message: string, type: ToastData['type'] = 'error') => {
@@ -144,6 +175,26 @@ export function JourneysTab() {
   const dismissToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id))
   }, [])
+
+  // Initialize git in project
+  const handleInitGit = useCallback(async () => {
+    if (!selectedProject?.root_path) return
+
+    setIsInitializingGit(true)
+    try {
+      const result = await window.electronAPI.git.init(selectedProject.root_path)
+      if (result.success) {
+        setGitStatus({ isRepo: true, checking: false })
+        showToast('Git repository initialized successfully', 'success')
+      } else {
+        showToast(result.error || 'Failed to initialize git', 'error')
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to initialize git', 'error')
+    } finally {
+      setIsInitializingGit(false)
+    }
+  }, [selectedProject?.root_path, showToast])
 
   // Filter journeys by active type
   const filteredJourneys = useMemo(() => {
@@ -339,6 +390,27 @@ export function JourneysTab() {
           ))}
         </div>
       </div>
+
+      {/* Git Status Warning Banner */}
+      {!gitStatus.checking && !gitStatus.isRepo && selectedProject && (
+        <div className="flex items-center justify-between px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
+          <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span className="text-sm">
+              This project is not a git repository. Initialize git to enable journey worktrees.
+            </span>
+          </div>
+          <Button
+            size="sm"
+            onClick={handleInitGit}
+            disabled={isInitializingGit}
+          >
+            {isInitializingGit ? 'Initializing...' : 'Initialize Git'}
+          </Button>
+        </div>
+      )}
 
       {/* Journey Type Tabs */}
       <div className="flex border-b border-gray-200 dark:border-gray-700">
