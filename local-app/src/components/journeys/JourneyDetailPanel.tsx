@@ -49,18 +49,18 @@ export function JourneyDetailPanel({
   }
 
   return (
-    <div className="fixed inset-y-0 right-0 w-[520px] bg-gray-900 border-l border-gray-700 shadow-2xl z-40 flex flex-col overflow-hidden">
+    <div className="fixed inset-y-0 right-0 w-[520px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shadow-2xl z-40 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-start justify-between p-4 border-b border-gray-700">
+      <div className="flex items-start justify-between p-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex-1 min-w-0 pr-4">
-          <h2 className="text-lg font-semibold text-white truncate">{journey.name}</h2>
-          <p className="text-sm text-gray-400 mt-1 truncate">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white truncate">{journey.name}</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 truncate">
             {journey.type.replace('_', ' ')} • {journey.stage.replace(/_/g, ' ')}
           </p>
         </div>
         <button
           onClick={onClose}
-          className="text-gray-400 hover:text-white transition-colors p-1"
+          className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors p-1"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -77,7 +77,7 @@ export function JourneyDetailPanel({
       </div>
 
       {/* Actions Footer */}
-      <div className="border-t border-gray-700 p-4 space-y-3">
+      <div className="border-t border-gray-200 dark:border-gray-700 p-4 space-y-3">
         {/* Quick Actions */}
         <div className="flex gap-2">
           {onOpenClaudeCode && (

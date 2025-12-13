@@ -83,20 +83,19 @@ function QuickIntakeForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-gray-800/50 rounded-lg p-4 mb-4">
+    <form onSubmit={handleSubmit} className="bg-gray-100 dark:bg-gray-800/50 rounded-lg p-4 mb-4 border border-gray-200 dark:border-transparent">
       <div className="flex gap-3">
         <div className="flex-1 space-y-2">
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={placeholders[journeyType]}
-            className="bg-gray-700"
           />
           <Input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Brief description (optional)"
-            className="bg-gray-700 text-sm"
+            className="text-sm"
           />
         </div>
         <Button type="submit" disabled={isSubmitting || !name.trim()}>
@@ -297,7 +296,7 @@ export function JourneysTab() {
   if (projectsLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="text-gray-400">Loading projects...</div>
+        <div className="text-gray-500 dark:text-gray-400">Loading projects...</div>
       </div>
     )
   }
@@ -306,10 +305,10 @@ export function JourneysTab() {
   if (projects.length === 0) {
     return (
       <div className="flex-1 flex flex-col p-4 overflow-hidden">
-        <h1 className="text-xl font-semibold text-white mb-4">Journeys</h1>
+        <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Journeys</h1>
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <p className="text-gray-400 mb-2">No projects yet</p>
+            <p className="text-gray-500 dark:text-gray-400 mb-2">No projects yet</p>
             <p className="text-sm text-gray-500">Create a project first to manage journeys</p>
           </div>
         </div>
@@ -322,7 +321,7 @@ export function JourneysTab() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Project Tabs */}
-      <div className="flex items-center border-b border-gray-700 bg-gray-900/50">
+      <div className="flex items-center border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
         <div className="px-4 py-2 text-sm font-medium text-gray-500">Project:</div>
         <div className="flex-1 flex overflow-x-auto">
           {projects.map((project) => (
@@ -331,8 +330,8 @@ export function JourneysTab() {
               onClick={() => setSelectedProjectId(project.id)}
               className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors border-b-2 ${
                 selectedProject?.id === project.id
-                  ? 'border-blue-500 text-blue-400 bg-gray-800/50'
-                  : 'border-transparent text-gray-400 hover:text-gray-200 hover:bg-gray-800/30'
+                  ? 'border-blue-500 text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-800/50'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800/30'
               }`}
             >
               {project.name}
@@ -342,7 +341,7 @@ export function JourneysTab() {
       </div>
 
       {/* Journey Type Tabs */}
-      <div className="flex border-b border-gray-700">
+      <div className="flex border-b border-gray-200 dark:border-gray-700">
         {journeyTypeOrder.map((type) => {
           const config = journeyTypeConfig[type]
           const stats = typeStats[type]
@@ -354,15 +353,15 @@ export function JourneysTab() {
               onClick={() => setActiveType(type)}
               className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
                 isActive
-                  ? 'border-blue-500 text-white bg-gray-800/30'
-                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:bg-gray-800/20'
+                  ? 'border-blue-500 text-gray-900 dark:text-white bg-blue-50 dark:bg-gray-800/30'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/20'
               }`}
             >
               <span>{config.icon}</span>
               <span className="text-sm font-medium">{config.label}</span>
               {stats.total > 0 && (
                 <span className={`text-xs px-1.5 py-0.5 rounded ${
-                  isActive ? 'bg-blue-500/20 text-blue-300' : 'bg-gray-700 text-gray-400'
+                  isActive ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-300' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
                 }`}>
                   {stats.completed}/{stats.total}
                 </span>
@@ -377,19 +376,19 @@ export function JourneysTab() {
         {/* Loading/Error states for journeys */}
         {loading ? (
           <div className="flex-1 flex items-center justify-center">
-            <div className="text-gray-400">Loading journeys...</div>
+            <div className="text-gray-500 dark:text-gray-400">Loading journeys...</div>
           </div>
         ) : error ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <p className="text-red-400 mb-2">Failed to load journeys</p>
+              <p className="text-red-500 dark:text-red-400 mb-2">Failed to load journeys</p>
               <p className="text-sm text-gray-500">{error.message}</p>
             </div>
           </div>
         ) : (
           <>
             {/* Type Description */}
-            <p className="text-sm text-gray-400 mb-4">{activeConfig.description}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{activeConfig.description}</p>
 
             {/* Quick Intake Form */}
             <QuickIntakeForm
@@ -403,7 +402,7 @@ export function JourneysTab() {
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center">
                   <span className="text-4xl mb-3 block">{activeConfig.icon}</span>
-                  <p className="text-gray-400 mb-1">No {activeConfig.label.toLowerCase()} journeys yet</p>
+                  <p className="text-gray-500 dark:text-gray-400 mb-1">No {activeConfig.label.toLowerCase()} journeys yet</p>
                   <p className="text-sm text-gray-500">Use the form above to create one</p>
                 </div>
               </div>
@@ -432,9 +431,9 @@ export function JourneysTab() {
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60" onClick={() => setDeleteConfirm(null)} />
-          <div className="relative bg-gray-800 rounded-lg p-4 max-w-sm w-full mx-4">
-            <h3 className="text-lg font-medium text-white mb-2">Delete Journey?</h3>
-            <p className="text-sm text-gray-400 mb-4">
+          <div className="relative bg-white dark:bg-gray-800 rounded-lg p-4 max-w-sm w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Delete Journey?</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
               This will delete the journey and its associated worktree (if any).
             </p>
             <div className="flex justify-end gap-2">

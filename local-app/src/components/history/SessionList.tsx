@@ -56,10 +56,10 @@ export function SessionList({
     return (
       <div className="flex-1 overflow-auto p-2">
         {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="p-3 mb-2 bg-gray-800 rounded-lg animate-pulse">
-            <div className="h-4 w-3/4 bg-gray-700 rounded mb-2" />
-            <div className="h-3 w-full bg-gray-700 rounded mb-2" />
-            <div className="h-3 w-1/2 bg-gray-700 rounded" />
+          <div key={i} className="p-3 mb-2 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse">
+            <div className="h-4 w-3/4 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+            <div className="h-3 w-full bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+            <div className="h-3 w-1/2 bg-gray-200 dark:bg-gray-700 rounded" />
           </div>
         ))}
       </div>
@@ -108,19 +108,19 @@ export function SessionList({
                 onClick={() => onSelectSession(session)}
                 className={`w-full text-left p-3 rounded-lg transition-colors ${
                   isSelected
-                    ? 'bg-blue-600/30 border border-blue-500/50'
-                    : 'bg-gray-800 hover:bg-gray-750 border border-transparent'
+                    ? 'bg-blue-100 dark:bg-blue-600/30 border border-blue-300 dark:border-blue-500/50'
+                    : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 border border-gray-200 dark:border-transparent'
                 }`}
               >
                 <div className="flex items-start justify-between gap-2 mb-1">
-                  <span className="text-sm font-medium text-gray-200 truncate">
+                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
                     {projectName}
                   </span>
                   <span className="text-xs text-gray-500 whitespace-nowrap">
                     {formatRelativeTime(session.timestamp)}
                   </span>
                 </div>
-                <p className="text-xs text-gray-400 line-clamp-2 mb-1">
+                <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mb-1">
                   {session.firstMessage}
                 </p>
                 <div className="flex items-center gap-2 text-xs text-gray-500">

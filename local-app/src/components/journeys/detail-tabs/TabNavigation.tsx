@@ -23,7 +23,7 @@ interface TabNavigationProps {
 
 export function TabNavigation({ activeTab, onTabChange, badges = {} }: TabNavigationProps) {
   return (
-    <div className="flex border-b border-gray-700 overflow-x-auto">
+    <div className="flex border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
       {TABS.map((tab) => {
         const badge = badges[tab.id]
         return (
@@ -32,13 +32,13 @@ export function TabNavigation({ activeTab, onTabChange, badges = {} }: TabNaviga
             onClick={() => onTabChange(tab.id)}
             className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
               activeTab === tab.id
-                ? 'text-blue-400 border-b-2 border-blue-400'
-                : 'text-gray-400 hover:text-gray-200'
+                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500 dark:border-blue-400'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
             }`}
           >
             {tab.label}
             {badge !== undefined && (
-              <span className="ml-1.5 text-xs bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded-full">
+              <span className="ml-1.5 text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded-full">
                 {badge}
               </span>
             )}

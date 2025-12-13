@@ -101,7 +101,7 @@ export function OverviewTab({ journey, onUpdate }: OverviewTabProps) {
       {/* Stage Progress */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-gray-300">Stage Progress</h3>
+          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Stage Progress</h3>
           <span className="text-xs text-gray-500">
             {currentStageIndex + 1} of {stages.length}
           </span>
@@ -109,7 +109,7 @@ export function OverviewTab({ journey, onUpdate }: OverviewTabProps) {
         <StageProgress stage={journey.stage} type={journey.type} />
 
         {/* Stage description */}
-        <p className="text-sm text-gray-400 bg-gray-800/50 rounded-lg p-3">
+        <p className="text-sm text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800/50 rounded-lg p-3">
           {stageDescriptions[journey.stage] || 'Working on this stage'}
         </p>
 
@@ -144,7 +144,7 @@ export function OverviewTab({ journey, onUpdate }: OverviewTabProps) {
 
       {/* Name (editable) */}
       <div className="space-y-2">
-        <h3 className="text-sm font-medium text-gray-300">Name</h3>
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Name</h3>
         {isEditing ? (
           <Input
             value={editName}
@@ -152,23 +152,23 @@ export function OverviewTab({ journey, onUpdate }: OverviewTabProps) {
             placeholder="Journey name"
           />
         ) : (
-          <p className="text-white font-medium">{journey.name}</p>
+          <p className="text-gray-900 dark:text-white font-medium">{journey.name}</p>
         )}
       </div>
 
       {/* Description */}
       <div className="space-y-2">
-        <h3 className="text-sm font-medium text-gray-300">Description</h3>
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Description</h3>
         {isEditing ? (
           <textarea
             value={editDescription}
             onChange={(e) => setEditDescription(e.target.value)}
             placeholder="Describe this journey..."
             rows={4}
-            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
           />
         ) : (
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             {journey.description || 'No description'}
           </p>
         )}
@@ -176,7 +176,7 @@ export function OverviewTab({ journey, onUpdate }: OverviewTabProps) {
 
       {/* Source URL */}
       <div className="space-y-2">
-        <h3 className="text-sm font-medium text-gray-300">Source URL</h3>
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Source URL</h3>
         {isEditing ? (
           <Input
             value={editSourceUrl}
@@ -199,7 +199,7 @@ export function OverviewTab({ journey, onUpdate }: OverviewTabProps) {
 
       {/* Tags */}
       <div className="space-y-2">
-        <h3 className="text-sm font-medium text-gray-300">Tags</h3>
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Tags</h3>
         {isEditing ? (
           <Input
             value={editTags}
@@ -209,7 +209,7 @@ export function OverviewTab({ journey, onUpdate }: OverviewTabProps) {
         ) : journey.tags && journey.tags.length > 0 ? (
           <div className="flex flex-wrap gap-1">
             {journey.tags.map((tag, i) => (
-              <span key={i} className="text-xs px-2 py-1 bg-gray-700 text-gray-300 rounded">
+              <span key={i} className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded">
                 {tag}
               </span>
             ))}
@@ -222,8 +222,8 @@ export function OverviewTab({ journey, onUpdate }: OverviewTabProps) {
       {/* Branch Info */}
       {journey.branch_name && (
         <div className="space-y-2">
-          <h3 className="text-sm font-medium text-gray-300">Git Branch</h3>
-          <code className="text-sm text-green-400 bg-gray-800 px-2 py-1 rounded font-mono block">
+          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Git Branch</h3>
+          <code className="text-sm text-green-600 dark:text-green-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded font-mono block">
             {journey.branch_name}
           </code>
           {journey.worktree_path && (
@@ -241,7 +241,7 @@ export function OverviewTab({ journey, onUpdate }: OverviewTabProps) {
       </div>
 
       {/* Edit Actions */}
-      <div className="flex gap-2 pt-2 border-t border-gray-700">
+      <div className="flex gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
         {isEditing ? (
           <>
             <Button variant="ghost" onClick={handleCancel}>

@@ -41,7 +41,7 @@ export function HistoryTab() {
     <div className="h-full flex flex-col">
       {/* Error banner */}
       {error && (
-        <div className="bg-red-900/50 border-b border-red-700 px-4 py-2 text-sm text-red-200">
+        <div className="bg-red-100 dark:bg-red-900/50 border-b border-red-300 dark:border-red-700 px-4 py-2 text-sm text-red-700 dark:text-red-200">
           {error}
         </div>
       )}
@@ -57,9 +57,9 @@ export function HistoryTab() {
       {/* Main content area */}
       <div className="flex-1 flex overflow-hidden">
         {/* Session list */}
-        <div className="w-80 border-r border-gray-700 overflow-hidden flex flex-col">
-          <div className="p-3 border-b border-gray-700 bg-gray-800/50">
-            <h3 className="text-sm font-medium text-gray-300">
+        <div className="w-80 border-r border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col">
+          <div className="p-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
               Sessions {sessions.length > 0 && `(${sessions.length})`}
             </h3>
           </div>
@@ -76,14 +76,14 @@ export function HistoryTab() {
         <div className="flex-1 overflow-hidden flex flex-col">
           {selectedSession ? (
             <>
-              <div className="p-3 border-b border-gray-700 bg-gray-800/50 flex items-center justify-between">
+              <div className="p-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between">
                 <div>
                   <button
                     onClick={() => {
                       console.log('Opening in Finder:', selectedSession.filePath)
                       openSessionInFinder(selectedSession.filePath)
                     }}
-                    className="text-sm font-medium text-gray-300 hover:text-blue-400 hover:underline cursor-pointer transition-colors flex items-center gap-1.5"
+                    className="text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:underline cursor-pointer transition-colors flex items-center gap-1.5"
                     title="Open in Finder"
                   >
                     {selectedSession.id.split('-').slice(0, 3).join('-')}

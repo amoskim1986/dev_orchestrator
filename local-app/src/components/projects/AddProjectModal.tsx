@@ -77,7 +77,7 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
         />
 
         <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-300">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             Root Path
           </label>
           <div className="flex gap-2">
@@ -87,7 +87,7 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
               onChange={(e) => setRootPath(e.target.value)}
               placeholder="/path/to/project"
               required
-              className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <Button type="button" variant="secondary" onClick={handleBrowse}>
               Browse
@@ -95,8 +95,8 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
           </div>
         </div>
 
-        <div className="border-t border-gray-700 pt-4">
-          <h3 className="text-sm font-medium text-gray-400 mb-3">
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
             Optional: Sub-paths for frontend/backend
           </h3>
 
@@ -116,8 +116,8 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
           </div>
         </div>
 
-        <div className="border-t border-gray-700 pt-4">
-          <h3 className="text-sm font-medium text-gray-400 mb-3">
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
             Start Commands
           </h3>
 
@@ -138,7 +138,7 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
         </div>
 
         {error && (
-          <p className="text-sm text-red-400">{error}</p>
+          <p className="text-sm text-red-500 dark:text-red-400">{error}</p>
         )}
 
         <div className="flex justify-end gap-2 pt-2">
