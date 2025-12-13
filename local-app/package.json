@@ -24,6 +24,7 @@
   "dependencies": {
     "@dev-orchestrator/shared": "*",
     "@supabase/supabase-js": "^2.87.1",
+    "@tailwindcss/typography": "^0.5.19",
     "@tanstack/react-virtual": "^3.13.13",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-web-links": "^0.11.0",
@@ -31,6 +32,9 @@
     "node-pty": "^1.0.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "simple-git": "^3.30.0",
     "zustand": "^5.0.9"
   },
   "devDependencies": {

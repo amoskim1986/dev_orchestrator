@@ -1,16 +1,20 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useProjects } from '../../hooks/useProjects'
 import { ProjectCard } from './ProjectCard'
 import { AddProjectModal } from './AddProjectModal'
-import { ProjectDetailModal } from './ProjectDetailModal'
 import { Button } from '../common/Button'
-import type { Project } from '@dev-orchestrator/shared'
 
 export function ProjectsTab() {
   const { projects, loading, error, createProject, deleteProject } = useProjects()
   const [showAddModal, setShowAddModal] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+
+  // Open project in a new window
+  const handleSelectProject = useCallback(async (projectId: string) => {
+    if (window.electronAPI?.projectDetail?.open) {
+      await window.electronAPI.projectDetail.open(projectId)
+    }
+  }, [])
 
   const handleDelete = async (id: string) => {
     try {
@@ -24,7 +28,7 @@ export function ProjectsTab() {
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="text-gray-400">Loading projects...</div>
+        <div className="text-gray-500 dark:text-gray-400">Loading projects...</div>
       </div>
     )
   }
@@ -33,7 +37,7 @@ export function ProjectsTab() {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-red-400 mb-2">Failed to load projects</p>
+          <p className="text-red-500 dark:text-red-400 mb-2">Failed to load projects</p>
           <p className="text-sm text-gray-500">{error.message}</p>
         </div>
       </div>
@@ -44,7 +48,7 @@ export function ProjectsTab() {
     <div className="flex-1 flex flex-col p-4 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold text-white">Projects</h1>
+        <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Projects</h1>
         <Button onClick={() => setShowAddModal(true)}>
           + Add Project
         </Button>
@@ -54,7 +58,7 @@ export function ProjectsTab() {
       {projects.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <p className="text-gray-400 mb-2">No projects yet</p>
+            <p className="text-gray-500 dark:text-gray-400 mb-2">No projects yet</p>
             <Button onClick={() => setShowAddModal(true)}>
               Add your first project
             </Button>
@@ -67,14 +71,14 @@ export function ProjectsTab() {
               <div key={project.id}>
                 <ProjectCard
                   project={project}
-                  onSelect={() => setSelectedProject(project)}
+                  onSelect={() => handleSelectProject(project.id)}
                   onDelete={() => setDeleteConfirm(project.id)}
                 />
 
                 {/* Delete confirmation */}
                 {deleteConfirm === project.id && (
-                  <div className="mt-2 p-3 bg-red-900/30 border border-red-800 rounded-lg">
-                    <p className="text-sm text-red-300 mb-2">
+                  <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
+                    <p className="text-sm text-red-700 dark:text-red-300 mb-2">
                       Delete "{project.name}"? This will also delete all associated journeys.
                     </p>
                     <div className="flex gap-2">
@@ -106,13 +110,6 @@ export function ProjectsTab() {
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         onSubmit={createProject}
-      />
-
-      {/* Project Detail Modal */}
-      <ProjectDetailModal
-        project={selectedProject}
-        isOpen={!!selectedProject}
-        onClose={() => setSelectedProject(null)}
       />
     </div>
   )

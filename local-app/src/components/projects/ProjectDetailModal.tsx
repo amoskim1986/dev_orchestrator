@@ -15,8 +15,8 @@ interface ChangesDialogData {
   changesSummary: string
   suggestedUpdates: string
   updatedDocument: string
-  onConfirm: () => void
-  onKeepCurrent: () => void
+  onConfirm: () => Promise<void>
+  onKeepCurrent: () => Promise<void>
 }
 
 export function ProjectDetailModal({ project, isOpen, onClose }: ProjectDetailModalProps) {

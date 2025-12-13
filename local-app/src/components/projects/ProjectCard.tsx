@@ -17,12 +17,12 @@ export function ProjectCard({ project, onSelect, onDelete }: ProjectCardProps) {
   return (
     <div
       onClick={onSelect}
-      className="p-3 rounded-lg bg-gray-800 border border-gray-700 hover:border-blue-500 hover:bg-gray-750 transition-colors cursor-pointer"
+      className="p-3 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors cursor-pointer shadow-sm"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h3 className="font-medium text-white truncate">{project.name}</h3>
+            <h3 className="font-medium text-gray-900 dark:text-white truncate">{project.name}</h3>
             {/* Intake status indicator */}
             {intakeStatus === 'ai' && (
               <span className="flex-shrink-0 w-2 h-2 rounded-full bg-green-400" title="AI-refined intake" />
@@ -31,7 +31,7 @@ export function ProjectCard({ project, onSelect, onDelete }: ProjectCardProps) {
               <span className="flex-shrink-0 w-2 h-2 rounded-full bg-yellow-400" title="Raw intake only" />
             )}
           </div>
-          <p className="text-xs text-gray-400 truncate mt-1" title={project.root_path}>
+          <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-1" title={project.root_path}>
             {project.root_path}
           </p>
         </div>
@@ -40,7 +40,7 @@ export function ProjectCard({ project, onSelect, onDelete }: ProjectCardProps) {
             e.stopPropagation()
             onDelete()
           }}
-          className="text-gray-500 hover:text-red-400 transition-colors p-1"
+          className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-colors p-1"
           title="Delete project"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -50,7 +50,7 @@ export function ProjectCard({ project, onSelect, onDelete }: ProjectCardProps) {
       </div>
 
       {/* Path info */}
-      <div className="mt-2 flex gap-3 text-xs text-gray-500">
+      <div className="mt-2 flex gap-3 text-xs text-gray-500 dark:text-gray-500">
         {project.frontend_path && (
           <span title={`Frontend: ${project.frontend_path}`}>
             FE: {project.frontend_path.split('/').pop()}

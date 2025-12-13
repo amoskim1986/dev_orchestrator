@@ -32,9 +32,9 @@ function Toast({ toast, onDismiss }: ToastProps) {
   }, [toast.id, toast.duration, onDismiss])
 
   const bgColor = {
-    error: 'bg-red-900/90 border-red-700',
-    success: 'bg-green-900/90 border-green-700',
-    info: 'bg-blue-900/90 border-blue-700',
+    error: 'bg-red-100 dark:bg-red-900/90 border-red-300 dark:border-red-700',
+    success: 'bg-green-100 dark:bg-green-900/90 border-green-300 dark:border-green-700',
+    info: 'bg-blue-100 dark:bg-blue-900/90 border-blue-300 dark:border-blue-700',
   }[toast.type]
 
   const icon = {
@@ -62,10 +62,10 @@ function Toast({ toast, onDismiss }: ToastProps) {
       }`}
     >
       {icon}
-      <p className="text-sm text-white flex-1">{toast.message}</p>
+      <p className="text-sm text-gray-800 dark:text-white flex-1">{toast.message}</p>
       <button
         onClick={() => onDismiss(toast.id)}
-        className="text-gray-400 hover:text-white transition-colors"
+        className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

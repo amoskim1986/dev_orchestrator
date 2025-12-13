@@ -2,7 +2,7 @@
 
 > **Status**: Partially Implemented
 > **Created**: 2024-12-12
-> **Last Updated**: 2024-12-12 (Project intake AI feature + Project tabs in Journeys)
+> **Last Updated**: 2024-12-12 (Added Phase 4 UI Implementation Roadmap)
 > **Scope**: Database schema expansion, TypeScript types, React hooks, UI components
 
 ---
@@ -1136,8 +1136,8 @@ const createIntake = async (rawContent: string) => {
 - [ ] Terminal output capture
 
 ### Phase 7: Git Worktree Integration (Future)
-- [ ] Create worktree on journey start
-- [ ] Delete worktree on journey delete
+- [ ] Add button to create/find worktree on journey (should move it into implementation)
+- [ ] Add button to delete worktree on journey
 - [ ] Worktree status display
 - [ ] Branch conflict detection
 
@@ -1211,3 +1211,305 @@ Prompts are generated based on journey type and stage:
 - Service: `local-app/electron/services/vscode-launcher/`
 - IPC: `local-app/electron/ipc/vscode-launcher.ipc.ts`
 - UI: "VS Code" button on JourneyCard (only shown for started journeys)
+
+---
+
+## Phase 4 UI Implementation Roadmap
+
+### Build Order & Dependencies
+
+The journey detail panel needs to be refactored from a single-pane view into a **tabbed interface with 6 tabs**. Build in this order:
+
+| Priority | Tab | Complexity | Est. Effort | Dependencies |
+|----------|-----|------------|-------------|--------------|
+| 1 | **Overview** | Low | 1 hour | Already done - extract from current panel |
+| 2 | **Intake** | Medium | 4-6 hours | Follow `ProjectIntakeEditor` pattern |
+| 3 | **Spec** | Medium | 3-4 hours | Depends on Intake existing |
+| 4 | **Checklists** | Medium-High | 4-6 hours | Independent - can build in parallel |
+| 5 | **Plan** | High | 6-8 hours | Depends on Spec existing |
+| 6 | **Links** | High | 4-6 hours | Independent - needs journey picker modal |
+
+**Total estimated effort**: ~25-35 hours
+
+### Why This Order?
+
+1. **Overview first**: Extract existing content, establish tabbed pattern
+2. **Intake second**: Closest pattern to existing `ProjectIntakeEditor`, builds confidence
+3. **Spec third**: Similar to Intake, generates from Intake content
+4. **Checklists fourth**: Self-contained, most user value for tracking work
+5. **Plan fifth**: Most complex structure, generates from Spec
+6. **Links last**: Requires journey picker UI, less critical for MVP
+
+---
+
+## Component Architecture
+
+### Container Structure
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  JourneyDetailPanel (container)                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌─ Header ──────────────────────────────────────────────────┐  │
+│  │  Journey Name                                    [✕ Close] │  │
+│  │  📋 Feature Planning • Stage: speccing                     │  │
+│  └────────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  ┌─ TabNavigation ────────────────────────────────────────────┐  │
+│  │  [Overview] [Intake] [Spec] [Plan] [Checklists] [Links]    │  │
+│  └────────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  ┌─ TabContent (conditional render) ──────────────────────────┐  │
+│  │                                                             │  │
+│  │  Content changes based on active tab...                     │  │
+│  │                                                             │  │
+│  │                                                             │  │
+│  └─────────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  ┌─ ActionsFooter (shared across all tabs) ───────────────────┐  │
+│  │  [← Previous Stage]  [Next Stage →]  [VS Code]  [Delete]   │  │
+│  └────────────────────────────────────────────────────────────┘  │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Shared Components to Extract
+
+| Component | Purpose | Reused From |
+|-----------|---------|-------------|
+| `TabNavigation` | Tab bar with active state | `ProjectIntakeEditor` pattern |
+| `MarkdownEditor` | Textarea with optional preview | New shared component |
+| `AIGenerateButton` | Button with loading spinner | `ProjectIntakeEditor` pattern |
+| `VersionSelector` | Dropdown for version history | New for Intake tab |
+| `EmptyState` | Consistent "no content" UI | Common component |
+
+### State Management
+
+- Each tab component manages its own local state
+- Use existing shared hooks (`useJourneyIntakes`, `useJourneySpec`, etc.)
+- AI operations via `useClaudeCli` hook from `local-app/src/hooks/useClaudeCli.ts`
+- Active tab stored in `JourneyDetailPanel` local state
+
+---
+
+## File Structure
+
+### Local App Components
+
+```
+local-app/src/components/journeys/
+├── JourneyDetailPanel.tsx        # REFACTOR: Add tab routing
+├── detail-tabs/                  # NEW FOLDER
+│   ├── index.ts                  # Export all tabs
+│   ├── TabNavigation.tsx         # Shared tab bar
+│   ├── OverviewTab.tsx           # Extract from current panel
+│   ├── IntakeTab.tsx             # Raw + refined intake
+│   ├── SpecTab.tsx               # Markdown spec editor
+│   ├── PlanTab.tsx               # Structured plan viewer/editor
+│   ├── ChecklistsTab.tsx         # Per-leg checklists
+│   └── LinksTab.tsx              # Journey relationships
+└── modals/                       # NEW FOLDER
+    └── JourneyPickerModal.tsx    # For adding links
+```
+
+### Web App Components
+
+Same structure, but simplified (no AI generation buttons):
+
+```
+web-app/src/components/journeys/
+├── JourneyDetailPanel.tsx        # REFACTOR: Add tab routing
+└── detail-tabs/                  # NEW FOLDER
+    ├── index.ts
+    ├── TabNavigation.tsx
+    ├── OverviewTab.tsx
+    ├── IntakeTab.tsx             # Read-only, no AI
+    ├── SpecTab.tsx               # Read-only, no AI
+    ├── PlanTab.tsx               # Read-only
+    ├── ChecklistsTab.tsx         # Full functionality
+    └── LinksTab.tsx              # Full functionality
+```
+
+### Difference Between Apps
+
+| Feature | Local App | Web App |
+|---------|-----------|---------|
+| AI "Generate" buttons | ✅ Yes | ❌ No |
+| Edit content | ✅ Yes | ✅ Yes (auto-save) |
+| Version history | ✅ Yes | ✅ Yes |
+| Checklists toggle | ✅ Yes | ✅ Yes |
+| VS Code launch | ✅ Yes | ❌ No |
+
+---
+
+## AI Integration Wiring
+
+### Existing Infrastructure
+
+| Layer | File | What's There |
+|-------|------|--------------|
+| **Prompts** | `local-app/electron/services/claude-cli/prompts.ts` | `buildIntakeRefinementPrompt()`, `buildSpecGenerationPrompt()`, `buildPlanGenerationPrompt()` |
+| **IPC Handlers** | `local-app/electron/ipc/claude-cli.ipc.ts` | Handlers for `claude:refineIntake`, `claude:generateSpec`, `claude:generatePlan` |
+| **Preload** | `local-app/electron/preload.ts` | API exposed to renderer |
+| **Store** | `local-app/src/stores/claudeCliStore.ts` | Zustand store for AI state |
+
+### Missing React Hooks (To Create)
+
+Add to `local-app/src/hooks/useClaudeCli.ts`:
+
+```typescript
+// Journey Intake AI refinement
+export function useJourneyIntakeAI() {
+  const { isProcessing, lastError, setProcessing, setError } = useClaudeCli()
+
+  const refineIntake = useCallback(
+    async (rawIntake: string, journeyType: JourneyType, projectContext?: string) => {
+      setProcessing(true)
+      try {
+        const result = await window.electronAPI.claude.refineIntake({
+          rawIntake,
+          journeyType,
+          projectContext
+        })
+        return result
+      } catch (err) {
+        setError(err as Error)
+        return null
+      } finally {
+        setProcessing(false)
+      }
+    },
+    [setProcessing, setError]
+  )
+
+  return { refineIntake, isProcessing, error: lastError }
+}
+
+// Spec generation
+export function useSpecGeneration() {
+  // Similar pattern...
+  const generateSpec = useCallback(async (refinedIntake: string, projectContext: string) => {
+    // Call window.electronAPI.claude.generateSpec(...)
+  }, [])
+  return { generateSpec, isProcessing, error }
+}
+
+// Plan generation
+export function usePlanGeneration() {
+  // Similar pattern...
+  const generatePlan = useCallback(async (spec: string, projectContext: string) => {
+    // Call window.electronAPI.claude.generatePlan(...)
+  }, [])
+  return { generatePlan, isProcessing, error }
+}
+```
+
+### UI Button Pattern
+
+Follow `ProjectIntakeEditor.tsx` pattern:
+
+```tsx
+// In IntakeTab.tsx
+const { refineIntake, isProcessing, error } = useJourneyIntakeAI()
+
+const handleGenerateRefinement = async () => {
+  const result = await refineIntake(rawContent, journey.type, projectContext)
+  if (result?.data) {
+    await createIntake(rawContent, JSON.stringify(result.data))
+    toast.success('Intake refined successfully')
+  }
+}
+
+<Button
+  onClick={handleGenerateRefinement}
+  disabled={isProcessing || !rawContent.trim()}
+>
+  {isProcessing ? (
+    <>
+      <Spinner className="mr-2" />
+      Refining...
+    </>
+  ) : (
+    '🤖 Refine with AI'
+  )}
+</Button>
+```
+
+---
+
+## Migration Path
+
+### Step-by-Step Refactor
+
+**Step 1: Create folder structure**
+```bash
+mkdir -p local-app/src/components/journeys/detail-tabs
+mkdir -p local-app/src/components/journeys/modals
+mkdir -p web-app/src/components/journeys/detail-tabs
+```
+
+**Step 2: Create TabNavigation component**
+- Copy pattern from `ProjectIntakeEditor` tab buttons
+- Make it generic with `tabs` prop and `activeTab` state
+
+**Step 3: Extract OverviewTab**
+- Move current `JourneyDetailPanel` content (name, description, stage progress, etc.)
+- Keep in same file initially, then extract
+
+**Step 4: Refactor JourneyDetailPanel**
+- Add `activeTab` state
+- Add `TabNavigation` above content
+- Conditionally render tab content
+- Keep `ActionsFooter` at bottom (always visible)
+
+**Step 5: Build remaining tabs one at a time**
+- Follow build order: Intake → Spec → Checklists → Plan → Links
+- Each tab uses its corresponding hook from `shared/src/hooks/`
+
+---
+
+## Testing Strategy
+
+### Unit Tests Per Component
+
+| Component | Key Test Cases |
+|-----------|----------------|
+| `TabNavigation` | Renders all 6 tabs, highlights active, calls `onChange` |
+| `OverviewTab` | Displays journey data, editable fields work, stage buttons work |
+| `IntakeTab` | Shows versions list, creates new intake, saves raw content, AI button state |
+| `SpecTab` | Displays markdown, saves on blur, AI generate button |
+| `PlanTab` | Renders leg structure, handles empty state, add/remove legs |
+| `ChecklistsTab` | Toggles items, shows progress %, add/remove items |
+| `LinksTab` | Shows relationships by type, add/remove links |
+
+### Integration Test Scenarios
+
+1. **Full Journey Workflow**
+   - Create journey → Add intake → Generate spec → Generate plan → Create checklists
+   - Verify data persists across tab switches
+
+2. **AI Generation Flow**
+   - Mock IPC handlers
+   - Verify loading states during generation
+   - Verify error handling on failure
+   - Verify success updates UI
+
+3. **Cross-Tab Data Consistency**
+   - Edit in one tab, switch tabs, verify data shows correctly
+   - Verify refetch on tab switch if stale
+
+### Manual QA Checklist
+
+- [ ] Navigate between all 6 tabs smoothly
+- [ ] Create journey, add raw intake
+- [ ] Trigger AI refinement, verify refined content appears
+- [ ] Generate spec from intake
+- [ ] Generate plan from spec (verify structured output)
+- [ ] Create checklists per leg
+- [ ] Toggle checklist items, verify progress updates
+- [ ] Add links to other journeys
+- [ ] Test empty states for each tab
+- [ ] Test error states (disconnect AI, network error)
+- [ ] Verify web app works (read-only AI features)
+- [ ] Test on both local app and web app

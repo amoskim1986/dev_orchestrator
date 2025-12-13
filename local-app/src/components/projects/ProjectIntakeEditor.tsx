@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Button } from '../common/Button'
 import { useProjectIntakeAI } from '../../hooks/useClaudeCli'
 import type { Project, ProjectUpdate } from '@dev-orchestrator/shared'
@@ -10,15 +12,17 @@ interface ProjectIntakeEditorProps {
     changesSummary: string
     suggestedUpdates: string
     updatedDocument: string
-    onConfirm: () => void
-    onKeepCurrent: () => void
+    onConfirm: () => Promise<void>
+    onKeepCurrent: () => Promise<void>
   }) => void
 }
 
 type TabId = 'raw' | 'ai'
+type AiViewMode = 'view' | 'edit'
 
 export function ProjectIntakeEditor({ project, onUpdate, onShowChangesDialog }: ProjectIntakeEditorProps) {
   const [activeTab, setActiveTab] = useState<TabId>('raw')
+  const [aiViewMode, setAiViewMode] = useState<AiViewMode>('view')
   const [rawContent, setRawContent] = useState(project.raw_intake || '')
   const [aiContent, setAiContent] = useState(project.ai_parsed_intake || '')
   const [isDirty, setIsDirty] = useState(false)
@@ -131,6 +135,15 @@ export function ProjectIntakeEditor({ project, onUpdate, onShowChangesDialog }: 
               setIsDirty(false)
             },
           })
+        } else {
+          // Claude CLI failed - save raw content without AI analysis
+          // The aiError state will show the error message from the hook
+          await onUpdate({
+            raw_intake: rawContent,
+            raw_intake_previous: previousRaw,
+            intake_updated_at: new Date().toISOString(),
+          })
+          setIsDirty(false)
         }
       } else {
         // Just save raw
@@ -200,14 +213,14 @@ export function ProjectIntakeEditor({ project, onUpdate, onShowChangesDialog }: 
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex flex-col p-4 space-y-3">
+      <div className="flex-1 min-h-0 flex flex-col p-4 space-y-3 overflow-hidden">
         {activeTab === 'raw' ? (
           <>
             <textarea
               value={rawContent}
               onChange={(e) => handleRawChange(e.target.value)}
               placeholder="Paste or type your raw project intake here..."
-              className="flex-1 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-mono text-sm"
+              className="flex-1 min-h-0 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-mono text-sm"
             />
             <div className="flex items-center justify-between">
               <div className="text-xs text-gray-500">
@@ -224,11 +237,36 @@ export function ProjectIntakeEditor({ project, onUpdate, onShowChangesDialog }: 
         ) : (
           <>
             <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
-              {project.ai_parsed_at ? (
-                <span>Generated on {formatDate(project.ai_parsed_at)}</span>
-              ) : (
-                <span>No AI-refined version yet</span>
-              )}
+              <div className="flex items-center gap-3">
+                {project.ai_parsed_at ? (
+                  <span>Generated on {formatDate(project.ai_parsed_at)}</span>
+                ) : (
+                  <span>No AI-refined version yet</span>
+                )}
+                {/* View/Edit Toggle */}
+                <div className="flex items-center bg-gray-700 rounded-md p-0.5">
+                  <button
+                    onClick={() => setAiViewMode('view')}
+                    className={`px-2 py-1 rounded text-xs transition-colors ${
+                      aiViewMode === 'view'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    View
+                  </button>
+                  <button
+                    onClick={() => setAiViewMode('edit')}
+                    className={`px-2 py-1 rounded text-xs transition-colors ${
+                      aiViewMode === 'edit'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Edit
+                  </button>
+                </div>
+              </div>
               <Button
                 variant="secondary"
                 size="sm"
@@ -238,12 +276,24 @@ export function ProjectIntakeEditor({ project, onUpdate, onShowChangesDialog }: 
                 {isProcessing ? 'Generating...' : 'Regenerate'}
               </Button>
             </div>
-            <textarea
-              value={aiContent}
-              onChange={(e) => handleAiChange(e.target.value)}
-              placeholder="AI-refined content will appear here..."
-              className="flex-1 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-mono text-sm"
-            />
+            {aiViewMode === 'view' ? (
+              <div className="flex-1 min-h-0 w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-md text-white overflow-y-auto prose prose-invert prose-sm max-w-none">
+                {aiContent ? (
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {aiContent}
+                  </ReactMarkdown>
+                ) : (
+                  <p className="text-gray-400 italic">AI-refined content will appear here...</p>
+                )}
+              </div>
+            ) : (
+              <textarea
+                value={aiContent}
+                onChange={(e) => handleAiChange(e.target.value)}
+                placeholder="AI-refined content will appear here..."
+                className="flex-1 min-h-0 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-mono text-sm"
+              />
+            )}
             {aiContent !== project.ai_parsed_intake && (
               <div className="flex items-center justify-end">
                 <Button

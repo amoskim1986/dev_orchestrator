@@ -351,7 +351,7 @@ psql -h aws-0-us-west-2.pooler.supabase.com -p 6543 -d postgres -U postgres.bxkx
 ┌─────────────────────────────────────────────────────────────────┐
 │  Project: [Project A] [Project B] [Project C]                   │
 ├─────────────────────────────────────────────────────────────────┤
-│  [📋 Planning] [✨ Feature] [🐛 Bug] [🔍 Investigation]         │
+│  [�� Planning] [✨ Feature] [🐛 Bug] [🔍 Investigation]         │
 ├─────────────────────────────────────────────────────────────────┤
 │  Journey cards...                                               │
 └─────────────────────────────────────────────────────────────────┘
@@ -361,50 +361,109 @@ psql -h aws-0-us-west-2.pooler.supabase.com -p 6543 -d postgres -U postgres.bxkx
 
 ---
 
-### Phase 4: Git Worktree Integration
+### Phase 3.5: Enhanced Journey Schema ⏳ PARTIAL
+
+**Goal**: Richer journey data model with types, stages, multi-target support, and sessions
+
+This phase expands the schema to support:
+- Journey types (feature_planning, feature, bug, investigation) with type-specific stages
+- Multi-target projects (rails, web, electron, mobile, chrome extension)
+- Journey intake/spec/plan/checklist workflow
+- Session tracking with process and AI tool management
+- Journey relationships (parent/child, dependencies, links)
+
+See [enhanced_journey_schema.md](_planning_docs/enhanced_journey_schema.md) for full details.
+
+**Database Schema** (✅ Complete):
+- [x] `project_targets` - multi-target project support
+- [x] `journeys` table updates - type, stage, parent, sort_order, tags, dependencies
+- [x] `journey_intakes` - versioned raw + AI-refined content
+- [x] `journey_specs` - the "what" document (1:1 with journey)
+- [x] `journey_plans` - the "how" document with structured legs
+- [x] `journey_checklists` - per-leg task lists with typed items
+- [x] `journey_links` - flexible relationships between journeys
+- [x] `journey_targets` - which targets a journey affects
+- [x] `journey_sessions` - session lifecycle tracking
+- [x] `session_processes` - running processes per session
+- [x] `session_ai_tools` - AI tools used per session
+
+**TypeScript Types** (✅ Complete):
+- [x] All entity types in `shared/src/types/index.ts`
+- [x] Insert/Update types for all new tables
+- [x] Stage types per journey type
+
+**React Hooks** (✅ Complete):
+- [x] `useJourneys` - updated with new fields, `updateStage()`, `getReadyJourneys()`
+- [x] `useProjectTargets` - CRUD for project targets
+- [x] `useJourneyIntakes` - versioned intakes
+- [x] `useJourneySpecs` - spec document management
+- [x] `useJourneyPlans` - plan document management
+- [x] `useJourneyChecklists` - task lists with toggle, progress
+- [x] `useJourneyLinks` - journey relationships
+- [x] `useJourneySessions` - session lifecycle, processes, AI tools
+
+**UI Components** (⏳ Partial):
+- [x] Journey type tabs (feature_planning, feature, bug, investigation)
+- [x] Type/stage badges on journey cards
+- [x] Stage forward/backward navigation in detail panel
+- [x] Quick intake form per journey type
+- [ ] Journey detail tabs (Intake, Spec, Plan, Checklists, Links)
+- [ ] Intake version history viewer
+- [ ] Spec editor with AI generation
+- [ ] Plan editor with legs/steps
+- [ ] Checklists tab with progress
+- [ ] Journey links/relationships tab
+- [ ] Session management panel
+- [ ] Project targets configuration
+
+**Validation**: Database migrated, types defined, hooks working. UI for journey content tabs pending.
+
+---
+
+### Phase 4: Git Worktree Integration ✅ COMPLETE
 
 **Goal**: Create and manage git worktrees for journeys
 
-- [ ] Install git library
-  ```bash
-  npm install simple-git
-  ```
+- [x] Install git library (`simple-git`)
 
-- [ ] Create `electron/services/git.service.ts`:
-  ```typescript
-  // Key functions:
-  - isGitRepo(path: string): Promise<boolean>
-  - getDefaultBranch(repoPath: string): Promise<string>
-  - createWorktree(repoPath, branchName, worktreePath): Promise<void>
-  - removeWorktree(repoPath, worktreePath): Promise<void>
-  - listWorktrees(repoPath): Promise<Worktree[]>
-  - getCurrentBranch(worktreePath): Promise<string>
-  - getStatus(worktreePath): Promise<GitStatus>
-  - pushBranch(worktreePath): Promise<void>
-  ```
+- [x] Create `electron/services/git.service.ts`:
+  - `isGitRepo()` - Check if path is a git repo
+  - `getDefaultBranch()` - Get main/master branch
+  - `createWorktree()` - Create worktree with new branch
+  - `removeWorktree()` - Remove worktree (force)
+  - `listWorktrees()` - List all worktrees
+  - `getStatus()` - Get branch status (ahead/behind, clean, etc.)
+  - `getCurrentBranch()` - Get current branch name
+  - Helper: `slugify()` and `toBranchName()` for naming
 
-- [ ] Create `electron/ipc/worktrees.ts` IPC handlers
-- [ ] Expose worktree methods in preload.ts
+- [x] Create `electron/ipc/git.ipc.ts` IPC handlers:
+  - `git:isRepo` - Check if path is a git repo
+  - `git:getDefaultBranch` - Get default branch
+  - `git:listWorktrees` - List worktrees
+  - `git:createWorktree` - Create worktree for journey
+  - `git:removeWorktree` - Remove worktree
+  - `git:getStatus` - Get git status
+  - `git:getCurrentBranch` - Get current branch
 
-- [ ] Update Journey "Start" flow:
-  - Journey starts in 'planning' status with NULL branch/worktree
-  - User clicks "Start Journey" → auto-generates branch name from journey name
-  - Creates worktree in `{repoPath}/.worktrees/{journey-slug}/`
-  - Updates journey with `startJourney(id, branchName, worktreePath)`
-  - Status changes to 'in_progress'
+- [x] Register IPC in main.ts and expose in preload.ts
 
-- [ ] Add UI elements:
-  - Git status indicator on journey card
-  - Branch name display (only shown after started)
-  - "Push Branch" action button
-  - "Start Journey" button for planning journeys
+- [x] Update Journey "Start" flow in JourneysTab.tsx:
+  - Check if project is a git repo first
+  - Create worktree via IPC
+  - Update journey with branch_name and worktree_path
+  - Show success/error toast
 
-- [ ] Handle journey deletion:
-  - Confirm dialog
-  - Remove worktree (if exists)
-  - Delete from database
+- [x] Add UI elements:
+  - Branch name badge on journey card (with git branch icon)
+  - "Start" button creates worktree
+  - VS Code button opens at worktree path
 
-**Validation**: Starting journey creates worktree, deleting cleans up
+- [x] Handle journey deletion:
+  - Attempts to remove worktree first (graceful failure)
+  - Then deletes from database
+  - Shows success toast
+
+**Validation**: ✅ Starting journey creates worktree, deleting cleans up
 
 ---
 
@@ -679,9 +738,17 @@ This delivers the core value: **parallel development with isolated environments*
 - **Phase 1-3**: ✅ Complete (Electron app, Supabase, basic UI)
 - **Phase 3b**: ✅ Complete (Project intake AI feature)
 - **Phase 3c**: ✅ Complete (Project tabs in Journeys view)
-- **Phase 4**: ⏳ Pending (Git worktree integration)
+- **Phase 3.5**: ⏳ Partial (Enhanced journey schema - DB/types/hooks done, UI pending)
+- **Phase 4**: ✅ Complete (Git worktree integration)
 - **Phase 5**: ✅ Complete (VS Code + Claude Code launcher)
 - **Phase 6**: ⏳ Pending (Process management)
+
+### Next Steps (Recommended Order)
+1. **Phase 3.5 UI** - Build journey detail tabs (Intake, Spec, Plan, Checklists, Links)
+   - This unlocks the full intake → spec → plan workflow
+   - Enables project targets configuration
+2. **Phase 6** - Process management
+   - Start/stop dev servers per journey per target
 
 ---
 
@@ -707,5 +774,74 @@ This delivers the core value: **parallel development with isolated environments*
 
 ---
 
+## Architecture Notes
+
+### Journey Content Workflow
+
+The enhanced journey schema introduces a structured workflow for developing features:
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                           JOURNEY WORKFLOW                                │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  1. INTAKE          2. SPEC           3. PLAN          4. CHECKLISTS    │
+│  ┌──────────┐      ┌──────────┐      ┌──────────┐      ┌──────────┐     │
+│  │Raw idea  │ ──→  │Refined   │ ──→  │Structured│ ──→  │Per-leg   │     │
+│  │from user │      │"what"    │      │"how"     │      │tasks     │     │
+│  │          │      │          │      │w/ legs   │      │          │     │
+│  │🤖 Refine │      │🤖 Generate│      │🤖 Generate│      │🤖 Generate│     │
+│  └──────────┘      └──────────┘      └──────────┘      └──────────┘     │
+│                                                                          │
+│  Versioned          Markdown          JSON w/ steps    Typed items:     │
+│  raw + AI           document          & file lists     📦 deliverable   │
+│                                                        🧪 test          │
+│                                                        👁 manual check   │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+### Multi-Target Project Architecture
+
+Projects can have multiple targets, each with its own dev server:
+
+```
+Project: "My SaaS App"
+├── rails (backend)      → port 4001, bin/rails server
+├── web (web_frontend)   → port 4201, npm run dev
+├── mobile (mobile)      → port 19000, npx expo start
+└── electron (desktop)   → npm run electron
+
+Journey: "Add dark mode"
+├── Affects targets: [web, mobile, electron]
+└── Session:
+    ├── Processes: web:4201, mobile:19000
+    └── AI Tools: claude_code → web, cursor → mobile
+```
+
+### Session Lifecycle
+
+Sessions track the active work period on a journey:
+
+```
+Session #1 (active)
+├── Started: 2024-12-10 10:00
+├── Editor: vscode
+├── Workspace: /worktrees/add-dark-mode
+├── Checklist: Leg 2 - Frontend Components
+├── Processes:
+│   ├── rails → 4001 (running)
+│   └── web → 4201 (running)
+└── AI Tools:
+    ├── claude_code → rails target
+    └── cursor → web target
+
+Session #2 (ended)
+├── Started: 2024-12-09 14:00
+├── Ended: 2024-12-09 18:30
+└── Notes: "Completed backend auth setup"
+```
+
+---
+
 *Document created: December 2024*
-*Last updated: December 2024 (Phase 3b/3c complete - Project intake AI + Project tabs in Journeys)*
+*Last updated: December 2024 (Phase 4 git worktree integration complete)*

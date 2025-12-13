@@ -122,10 +122,22 @@ ${jsonSchema}`;
 
       const args = ['--print'];
 
+      // Extend PATH to include common npm global install locations
+      // Electron apps don't inherit shell PATH on macOS
+      const homedir = process.env.HOME || '';
+      const extendedPath = [
+        '/opt/homebrew/bin',
+        '/usr/local/bin',
+        `${homedir}/.npm-global/bin`,
+        `${homedir}/.local/bin`,
+        `${homedir}/.nvm/versions/node/22/bin`, // Common nvm path
+        process.env.PATH,
+      ].filter(Boolean).join(':');
+
       const proc = spawn('claude', args, {
         cwd: request.workingDirectory,
         shell: true,
-        env: { ...process.env },
+        env: { ...process.env, PATH: extendedPath },
       });
 
       let stdout = '';
@@ -143,6 +155,14 @@ ${jsonSchema}`;
 
       proc.stderr.on('data', (data) => {
         stderr += data.toString();
+      });
+
+      // Handle stdin errors (EPIPE if process exits before we finish writing)
+      proc.stdin.on('error', (err) => {
+        // EPIPE is expected if process exits early - don't treat as fatal
+        if ((err as NodeJS.ErrnoException).code !== 'EPIPE') {
+          console.error('Claude CLI stdin error:', err);
+        }
       });
 
       // Send prompt to stdin

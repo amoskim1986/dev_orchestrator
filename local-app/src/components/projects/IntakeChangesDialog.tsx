@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Modal } from '../common/Modal'
 import { Button } from '../common/Button'
 
@@ -7,8 +8,8 @@ interface IntakeChangesDialogProps {
   changesSummary: string
   suggestedUpdates: string
   updatedDocument: string
-  onConfirm: () => void
-  onKeepCurrent: () => void
+  onConfirm: () => Promise<void>
+  onKeepCurrent: () => Promise<void>
 }
 
 export function IntakeChangesDialog({
@@ -19,14 +20,33 @@ export function IntakeChangesDialog({
   onConfirm,
   onKeepCurrent,
 }: IntakeChangesDialogProps) {
-  const handleConfirm = () => {
-    onConfirm()
-    onClose()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleConfirm = async () => {
+    setIsSubmitting(true)
+    setError(null)
+    try {
+      await onConfirm()
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  const handleKeepCurrent = () => {
-    onKeepCurrent()
-    onClose()
+  const handleKeepCurrent = async () => {
+    setIsSubmitting(true)
+    setError(null)
+    try {
+      await onKeepCurrent()
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -50,15 +70,19 @@ export function IntakeChangesDialog({
           Would you like to update the AI-refined document with these changes?
         </p>
 
+        {error && (
+          <p className="text-sm text-red-400">{error}</p>
+        )}
+
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button variant="secondary" onClick={handleKeepCurrent}>
-            Keep Current AI Doc
+          <Button variant="secondary" onClick={handleKeepCurrent} disabled={isSubmitting}>
+            {isSubmitting ? 'Saving...' : 'Keep Current AI Doc'}
           </Button>
-          <Button onClick={handleConfirm}>
-            Update AI Document
+          <Button onClick={handleConfirm} disabled={isSubmitting}>
+            {isSubmitting ? 'Updating...' : 'Update AI Document'}
           </Button>
         </div>
       </div>

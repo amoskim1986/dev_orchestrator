@@ -45,6 +45,17 @@ echo "   Using Node $(node -v)"
 # Unset ELECTRON_RUN_AS_NODE to ensure Electron works properly
 unset ELECTRON_RUN_AS_NODE
 
+# Set up PATH to include common locations for npm global packages
+# This helps spawned processes find commands like 'claude'
+export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.npm-global/bin:$HOME/.local/bin:$PATH"
+
+# Add nvm node bin to PATH if using nvm
+if [ -n "$NVM_BIN" ]; then
+    export PATH="$NVM_BIN:$PATH"
+fi
+
+echo "   PATH includes: $(which claude 2>/dev/null || echo 'claude not found in PATH')"
+
 # Start the app
 echo ""
 echo "4. Starting Dev Orchestrator..."
