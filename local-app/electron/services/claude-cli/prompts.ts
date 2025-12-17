@@ -141,6 +141,30 @@ Be specific about what needs to be built, modified, or removed.`;
 }
 
 // =============================================================================
+// SPEC REFINEMENT PROMPTS
+// =============================================================================
+
+/**
+ * Build prompt for refining an existing spec based on user feedback
+ */
+export function buildSpecRefinementPrompt(
+  currentSpec: string,
+  feedback: string
+): string {
+  return `You are refining a technical specification based on user feedback.
+
+Current Specification:
+${currentSpec}
+
+User Feedback:
+${feedback}
+
+Apply the user's feedback to update the specification. Preserve all existing content that wasn't addressed by the feedback, and make the requested changes/additions.
+
+Be specific about what needs to be built, modified, or removed.`;
+}
+
+// =============================================================================
 // PLAN GENERATION PROMPTS
 // =============================================================================
 
@@ -190,6 +214,26 @@ Generate an actionable implementation plan that:
 Each task should be independently completable and testable.`;
 
   return prompt;
+}
+
+/**
+ * Build prompt for refining an existing plan based on user feedback
+ */
+export function buildPlanRefinementPrompt(
+  currentPlan: string,
+  feedback: string
+): string {
+  return `You are refining an implementation plan based on user feedback.
+
+Current Plan:
+${currentPlan}
+
+User Feedback:
+${feedback}
+
+Apply the user's feedback to update the plan. Preserve all existing content that wasn't addressed by the feedback, and make the requested changes/additions.
+
+Be specific about phases, tasks, dependencies, and deliverables.`;
 }
 
 // =============================================================================
@@ -429,6 +473,290 @@ Return your response as valid JSON matching this schema:
   "suggested_updates": "string explaining updates",
   "updated_document": "string with full markdown document"
 }`;
+}
+
+// =============================================================================
+// PROPOSED PROJECT JOURNEYS PROMPTS
+// =============================================================================
+
+export const PROPOSED_JOURNEYS_SCHEMA = `{
+  "journeys": [
+    {
+      "name": "string - concise title for the journey",
+      "description": "string - what this journey accomplishes",
+      "early_plan": "string - brief implementation approach (2-4 sentences)"
+    }
+  ]
+}`;
+
+export interface GeneratedProposedJourney {
+  name: string;
+  description: string;
+  early_plan: string;
+}
+
+export interface ProposedJourneysResult {
+  journeys: GeneratedProposedJourney[];
+}
+
+export interface ExistingProposalContext {
+  name: string;
+  description: string;
+  status: string;
+}
+
+/**
+ * Build prompt for generating proposed journeys from a project's AI-parsed intake.
+ * Returns a list of logical development journeys to build the project.
+ *
+ * @param aiParsedIntake - The AI-refined project intake document
+ * @param projectName - The name of the project
+ * @param existingProposals - Existing proposals with their statuses
+ * @param codebasePath - Optional path to the codebase root for analysis
+ */
+export function buildProposedJourneysPrompt(
+  aiParsedIntake: string,
+  projectName: string,
+  existingProposals?: ExistingProposalContext[],
+  codebasePath?: string
+): string {
+  let contextNote = '';
+  const hasExisting = existingProposals && existingProposals.length > 0;
+
+  if (hasExisting) {
+    const rejected = existingProposals.filter(p => p.status === 'rejected');
+    const generated = existingProposals.filter(p => p.status === 'generated');
+    const drafts = existingProposals.filter(p => p.status === 'draft');
+    const alreadyCompleted = existingProposals.filter(p => p.status === 'already_completed');
+
+    if (drafts.length > 0) {
+      contextNote += `\n\nEXISTING DRAFT PROPOSALS (already suggested, do not duplicate):\n${drafts.map(p => `- ${p.name}: ${p.description}`).join('\n')}`;
+    }
+    if (generated.length > 0) {
+      contextNote += `\n\nALREADY CREATED JOURNEYS (do not duplicate):\n${generated.map(p => `- ${p.name}: ${p.description}`).join('\n')}`;
+    }
+    if (alreadyCompleted.length > 0) {
+      contextNote += `\n\nALREADY COMPLETED (these were marked as already done, do not suggest):\n${alreadyCompleted.map(p => `- ${p.name}: ${p.description}`).join('\n')}`;
+    }
+    if (rejected.length > 0) {
+      contextNote += `\n\nREJECTED PROPOSALS (do NOT suggest these again):\n${rejected.map(p => `- ${p.name}`).join('\n')}`;
+    }
+  }
+
+  let codebaseSection = '';
+  if (codebasePath) {
+    codebaseSection = `
+
+CODEBASE LOCATION:
+The project codebase is located at: ${codebasePath}
+
+IMPORTANT - CODEBASE ANALYSIS:
+Before generating journeys, you MUST analyze the existing codebase to understand:
+1. What has already been built/implemented
+2. The current project structure and architecture
+3. Existing patterns and conventions in use
+4. What functionality is missing based on the intake document
+
+Use your tools to explore the codebase:
+- List the directory structure to understand the project layout
+- Read key files (package.json, README, main entry points, etc.)
+- Search for existing implementations of features mentioned in the intake
+
+DO NOT suggest journeys for functionality that already exists in the codebase. Only suggest journeys for work that still needs to be done.`;
+  }
+
+  const taskDescription = hasExisting
+    ? `Based on the intake document${codebasePath ? ', your analysis of the existing codebase,' : ''} and the existing journeys listed above, identify ADDITIONAL journeys that are still needed to complete this project. Only suggest NEW journeys that aren't already covered${codebasePath ? ' or already implemented in the codebase' : ''}.`
+    : `Based on this intake document${codebasePath ? ' and your analysis of the existing codebase' : ''}, identify ALL logical development journeys (features, investigations, or tasks) that would need to be completed to build this project.${codebasePath ? ' Skip any work that is already implemented in the codebase.' : ''}`;
+
+  return `You are analyzing a project intake document for "${projectName}" to break it down into discrete development journeys.
+
+PROJECT INTAKE:
+${aiParsedIntake}${contextNote}${codebaseSection}
+
+TASK:
+${taskDescription}
+
+GUIDELINES:
+1. Each journey should be a coherent, self-contained piece of work
+2. Journeys should be ordered by logical dependency (foundations first)
+3. Keep journey names concise but descriptive (5-10 words max)
+4. The description should clearly state what this journey accomplishes (1-2 sentences)
+5. The early_plan should outline the general implementation approach (2-4 sentences)
+6. Generate as many journeys as needed - don't artificially limit the count
+7. Include foundational work (setup, architecture, core infrastructure) as early journeys
+8. Group related functionality into single journeys when appropriate
+9. Later journeys can build on earlier ones
+${hasExisting ? '10. Only return NEW journeys - do not repeat existing ones' : ''}
+${codebasePath ? `${hasExisting ? '11' : '10'}. Do NOT suggest journeys for features that already exist in the codebase - verify by checking the code first` : ''}
+
+Return your response as valid JSON matching this schema:
+${PROPOSED_JOURNEYS_SCHEMA}`;
+}
+
+// =============================================================================
+// PROPOSED CHILD JOURNEYS PROMPTS (for feature_planning journeys)
+// =============================================================================
+
+export const PROPOSED_CHILD_JOURNEYS_SCHEMA = `{
+  "journeys": [
+    {
+      "name": "string - concise title for the feature journey",
+      "description": "string - what this feature accomplishes",
+      "early_plan": "string - brief implementation approach (2-4 sentences)",
+      "checklist_items": ["string - todo item 1", "string - todo item 2", ...]
+    }
+  ]
+}`;
+
+export interface GeneratedChildJourney {
+  name: string;
+  description: string;
+  early_plan: string;
+  checklist_items: string[];
+}
+
+export interface ProposedChildJourneysResult {
+  journeys: GeneratedChildJourney[];
+}
+
+export interface ExistingChildProposalContext {
+  name: string;
+  description: string;
+  status: string;
+}
+
+/**
+ * Build prompt for generating proposed child journeys from a feature_planning journey's spec.
+ * Returns a list of feature journeys that implement the planned feature.
+ *
+ * @param spec - The spec document from the feature_planning journey
+ * @param journeyName - The name of the planning journey
+ * @param existingProposals - Existing proposals with their statuses
+ * @param codebasePath - Optional path to the codebase root for analysis
+ */
+export function buildProposedChildJourneysPrompt(
+  spec: string,
+  journeyName: string,
+  existingProposals?: ExistingChildProposalContext[],
+  codebasePath?: string
+): string {
+  let contextNote = '';
+  const hasExisting = existingProposals && existingProposals.length > 0;
+
+  if (hasExisting) {
+    const rejected = existingProposals.filter(p => p.status === 'rejected');
+    const generated = existingProposals.filter(p => p.status === 'generated');
+    const drafts = existingProposals.filter(p => p.status === 'draft');
+
+    if (drafts.length > 0) {
+      contextNote += `\n\nEXISTING DRAFT PROPOSALS (already suggested, do not duplicate):\n${drafts.map(p => `- ${p.name}: ${p.description}`).join('\n')}`;
+    }
+    if (generated.length > 0) {
+      contextNote += `\n\nALREADY CREATED JOURNEYS (do not duplicate):\n${generated.map(p => `- ${p.name}: ${p.description}`).join('\n')}`;
+    }
+    if (rejected.length > 0) {
+      contextNote += `\n\nREJECTED PROPOSALS (do NOT suggest these again):\n${rejected.map(p => `- ${p.name}`).join('\n')}`;
+    }
+  }
+
+  let codebaseSection = '';
+  if (codebasePath) {
+    codebaseSection = `
+
+CODEBASE LOCATION:
+The project codebase is located at: ${codebasePath}
+
+IMPORTANT - CODEBASE ANALYSIS:
+Before generating journeys, analyze the existing codebase to understand:
+1. What has already been built/implemented
+2. The current project structure and architecture
+3. Existing patterns and conventions in use
+
+DO NOT suggest journeys for functionality that already exists.`;
+  }
+
+  const taskDescription = hasExisting
+    ? `Based on the spec${codebasePath ? ', the existing codebase,' : ''} and the existing proposals listed above, identify ADDITIONAL feature journeys still needed. Only suggest NEW journeys.`
+    : `Based on this spec${codebasePath ? ' and the existing codebase' : ''}, identify the feature journeys needed to implement this planned feature.`;
+
+  return `You are breaking down a feature planning spec for "${journeyName}" into discrete implementation journeys.
+
+FEATURE SPEC:
+${spec}${contextNote}${codebaseSection}
+
+TASK:
+${taskDescription}
+
+GUIDELINES:
+1. Each journey should be a coherent, self-contained feature that can be implemented independently
+2. Journeys should be ordered by logical dependency (foundations first, then features that depend on them)
+3. Keep journey names concise but descriptive (5-10 words max)
+4. The description should clearly state what this journey accomplishes (1-2 sentences)
+5. The early_plan should outline the implementation approach (2-4 sentences)
+6. Include 3-8 checklist_items per journey - specific, actionable todos for implementation
+7. Checklist items should cover: setup, core implementation, edge cases, tests, documentation
+8. Generate as many journeys as needed to fully implement the spec
+9. Each journey should result in a working, testable increment
+${hasExisting ? '10. Only return NEW journeys - do not repeat existing ones' : ''}
+
+Return your response as valid JSON matching this schema:
+${PROPOSED_CHILD_JOURNEYS_SCHEMA}`;
+}
+
+// =============================================================================
+// JOURNEY IDEA PARSING PROMPTS
+// =============================================================================
+
+export const PARSED_JOURNEY_IDEA_SCHEMA = `{
+  "name": "string - concise title (5-10 words max)",
+  "description": "string - detailed description of what this accomplishes",
+  "early_plan": "string - brief implementation approach (2-4 sentences)",
+  "type": "feature_planning | feature | bug | investigation"
+}`;
+
+export interface ParsedJourneyIdea {
+  name: string;
+  description: string;
+  early_plan: string;
+  type: 'feature_planning' | 'feature' | 'bug' | 'investigation';
+}
+
+/**
+ * Build prompt for parsing a raw dictated/typed journey idea into structured fields.
+ * Auto-detects the journey type based on content.
+ */
+export function buildParseJourneyIdeaPrompt(
+  rawText: string,
+  projectName: string
+): string {
+  return `You are parsing a raw journey idea for a software project called "${projectName}".
+
+The user has dictated or typed a freeform description of something they want to build, fix, or investigate. Your task is to:
+
+1. Extract a concise, descriptive title (name)
+2. Write a clear description of what this journey accomplishes
+3. Suggest a brief early implementation plan
+4. Detect the appropriate journey type
+
+RAW INPUT:
+${rawText}
+
+JOURNEY TYPES:
+- "feature_planning": Planning a new feature (needs specs, designs, plans before implementation)
+- "feature": Implementing an already-planned feature (ready to code)
+- "bug": Fixing a reported bug or issue
+- "investigation": Research, exploration, or learning without specific implementation
+
+DETECTION GUIDELINES:
+- If the input mentions "bug", "fix", "broken", "error", "issue", "not working" → type is "bug"
+- If the input mentions "research", "investigate", "explore", "learn", "understand", "POC", "spike" → type is "investigation"
+- If the input describes something that needs planning/design first → type is "feature_planning"
+- If the input describes something ready to implement with clear requirements → type is "feature"
+- When in doubt, default to "feature_planning"
+
+Return your response as valid JSON matching this schema:
+${PARSED_JOURNEY_IDEA_SCHEMA}`;
 }
 
 // Type exports for the response shapes

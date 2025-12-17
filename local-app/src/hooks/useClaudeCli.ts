@@ -59,6 +59,12 @@ export function useClaudeCli() {
     // Project intake actions
     refineProjectIntake: store.refineProjectIntake,
     analyzeProjectIntakeChanges: store.analyzeProjectIntakeChanges,
+    // Proposed journeys actions
+    generateProposedJourneys: store.generateProposedJourneys,
+    lastProposedJourneys: store.lastProposedJourneys,
+    // Journey idea parsing actions
+    parseJourneyIdea: store.parseJourneyIdea,
+    lastParsedJourneyIdea: store.lastParsedJourneyIdea,
     clearQueue: store.clearQueue,
     clearError: store.clearError,
     refreshStatus: store.refreshStatus,
@@ -169,6 +175,66 @@ export function useProjectIntakeAI() {
     isProcessing,
     refinement: lastProjectIntakeRefinement,
     update: lastProjectIntakeUpdate,
+    error: lastError,
+    durationMs: lastDurationMs,
+    clearError,
+  }
+}
+
+/**
+ * Hook for generating proposed journeys from project intake
+ */
+export function useProposedJourneysAI() {
+  const {
+    generateProposedJourneys,
+    isProcessing,
+    lastProposedJourneys,
+    lastError,
+    lastDurationMs,
+    clearError,
+  } = useClaudeCli()
+
+  const generate = useCallback(
+    async (aiParsedIntake: string, projectName: string, existingProposals?: { name: string; description: string; status: string }[], codebasePath?: string) => {
+      return generateProposedJourneys(aiParsedIntake, projectName, existingProposals, codebasePath)
+    },
+    [generateProposedJourneys]
+  )
+
+  return {
+    generate,
+    isGenerating: isProcessing,
+    result: lastProposedJourneys,
+    error: lastError,
+    durationMs: lastDurationMs,
+    clearError,
+  }
+}
+
+/**
+ * Hook for parsing raw journey ideas into structured format with AI
+ */
+export function useJourneyIdeaParser() {
+  const {
+    parseJourneyIdea,
+    isProcessing,
+    lastParsedJourneyIdea,
+    lastError,
+    lastDurationMs,
+    clearError,
+  } = useClaudeCli()
+
+  const parse = useCallback(
+    async (rawText: string, projectName: string) => {
+      return parseJourneyIdea(rawText, projectName)
+    },
+    [parseJourneyIdea]
+  )
+
+  return {
+    parse,
+    isParsing: isProcessing,
+    result: lastParsedJourneyIdea,
     error: lastError,
     durationMs: lastDurationMs,
     clearError,

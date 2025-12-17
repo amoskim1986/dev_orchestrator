@@ -10,7 +10,9 @@ import {
   // New intake/spec/plan prompts
   buildIntakeRefinementPrompt,
   buildSpecGenerationPrompt,
+  buildSpecRefinementPrompt,
   buildPlanGenerationPrompt,
+  buildPlanRefinementPrompt,
   REFINED_INTAKE_SCHEMA,
   SPEC_SCHEMA,
   PLAN_SCHEMA,
@@ -27,6 +29,20 @@ import {
   PROJECT_INTAKE_UPDATE_SCHEMA,
   ProjectIntakeRefinement,
   ProjectIntakeUpdate,
+  // Proposed journeys prompts
+  buildProposedJourneysPrompt,
+  PROPOSED_JOURNEYS_SCHEMA,
+  ProposedJourneysResult,
+  ExistingProposalContext,
+  // Proposed child journeys prompts
+  buildProposedChildJourneysPrompt,
+  PROPOSED_CHILD_JOURNEYS_SCHEMA,
+  ProposedChildJourneysResult,
+  ExistingChildProposalContext,
+  // Journey idea parsing prompts
+  buildParseJourneyIdeaPrompt,
+  PARSED_JOURNEY_IDEA_SCHEMA,
+  ParsedJourneyIdea,
 } from '../services/claude-cli/prompts';
 
 // Response types for new prompts
@@ -146,14 +162,16 @@ export function registerClaudeCliIpc() {
         refinedIntake,
         projectContext,
         techStack,
+        workingDirectory,
       }: {
         refinedIntake: string;
         projectContext?: string;
         techStack?: string;
+        workingDirectory?: string;
       }
     ) => {
       const prompt = buildSpecGenerationPrompt(refinedIntake, projectContext, techStack);
-      return service.queryJson<Spec>(prompt, SPEC_SCHEMA);
+      return service.queryJson<Spec>(prompt, SPEC_SCHEMA, { workingDirectory });
     }
   );
 
@@ -165,13 +183,55 @@ export function registerClaudeCliIpc() {
       {
         spec,
         projectContext,
+        workingDirectory,
       }: {
         spec: string;
         projectContext?: string;
+        workingDirectory?: string;
       }
     ) => {
       const prompt = buildPlanGenerationPrompt(spec, projectContext);
-      return service.queryJson<Plan>(prompt, PLAN_SCHEMA);
+      return service.queryJson<Plan>(prompt, PLAN_SCHEMA, { workingDirectory });
+    }
+  );
+
+  // Refine plan based on user feedback
+  ipcMain.handle(
+    'claude:refinePlan',
+    async (
+      _event,
+      {
+        currentPlan,
+        feedback,
+        workingDirectory,
+      }: {
+        currentPlan: string;
+        feedback: string;
+        workingDirectory?: string;
+      }
+    ) => {
+      const prompt = buildPlanRefinementPrompt(currentPlan, feedback);
+      return service.queryJson<Plan>(prompt, PLAN_SCHEMA, { workingDirectory });
+    }
+  );
+
+  // Refine spec based on user feedback
+  ipcMain.handle(
+    'claude:refineSpec',
+    async (
+      _event,
+      {
+        currentSpec,
+        feedback,
+        workingDirectory,
+      }: {
+        currentSpec: string;
+        feedback: string;
+        workingDirectory?: string;
+      }
+    ) => {
+      const prompt = buildSpecRefinementPrompt(currentSpec, feedback);
+      return service.queryJson<Spec>(prompt, SPEC_SCHEMA, { workingDirectory });
     }
   );
 
@@ -271,6 +331,77 @@ export function registerClaudeCliIpc() {
     ) => {
       const prompt = buildProjectIntakeUpdatePrompt(previousRaw, newRaw, existingAiDoc, projectName);
       return service.queryJson<ProjectIntakeUpdate>(prompt, PROJECT_INTAKE_UPDATE_SCHEMA);
+    }
+  );
+
+  // =============================================================================
+  // PROPOSED JOURNEYS: Generate journey proposals from project intake
+  // =============================================================================
+
+  ipcMain.handle(
+    'claude:generateProposedJourneys',
+    async (
+      _event,
+      {
+        aiParsedIntake,
+        projectName,
+        existingProposals,
+        codebasePath,
+      }: {
+        aiParsedIntake: string;
+        projectName: string;
+        existingProposals?: ExistingProposalContext[];
+        codebasePath?: string;
+      }
+    ) => {
+      const prompt = buildProposedJourneysPrompt(aiParsedIntake, projectName, existingProposals, codebasePath);
+      return service.queryJson<ProposedJourneysResult>(prompt, PROPOSED_JOURNEYS_SCHEMA);
+    }
+  );
+
+  // =============================================================================
+  // PROPOSED CHILD JOURNEYS: Generate child journeys from feature_planning spec
+  // =============================================================================
+
+  ipcMain.handle(
+    'claude:generateProposedChildJourneys',
+    async (
+      _event,
+      {
+        spec,
+        journeyName,
+        existingProposals,
+        codebasePath,
+      }: {
+        spec: string;
+        journeyName: string;
+        existingProposals?: ExistingChildProposalContext[];
+        codebasePath?: string;
+      }
+    ) => {
+      const prompt = buildProposedChildJourneysPrompt(spec, journeyName, existingProposals, codebasePath);
+      return service.queryJson<ProposedChildJourneysResult>(prompt, PROPOSED_CHILD_JOURNEYS_SCHEMA);
+    }
+  );
+
+  // =============================================================================
+  // JOURNEY IDEA PARSING: Parse raw dictated/typed input into structured journey
+  // =============================================================================
+
+  ipcMain.handle(
+    'claude:parseJourneyIdea',
+    async (
+      _event,
+      {
+        rawText,
+        projectName,
+      }: {
+        rawText: string;
+        projectName: string;
+      }
+    ) => {
+      const prompt = buildParseJourneyIdeaPrompt(rawText, projectName);
+      return service.queryJson<ParsedJourneyIdea>(prompt, PARSED_JOURNEY_IDEA_SCHEMA);
     }
   );
 

@@ -196,6 +196,30 @@ interface ProjectIntakeUpdate {
   updated_document: string
 }
 
+interface ProposedJourneysResult {
+  journeys: {
+    name: string
+    description: string
+    early_plan: string
+  }[]
+}
+
+interface ProposedChildJourneysResult {
+  journeys: {
+    name: string
+    description: string
+    early_plan: string
+    checklist_items: string[]
+  }[]
+}
+
+interface ParsedJourneyIdea {
+  name: string
+  description: string
+  early_plan: string
+  type: 'feature_planning' | 'feature' | 'bug' | 'investigation'
+}
+
 // Git types
 interface GitWorktree {
   path: string
@@ -224,6 +248,32 @@ interface CreateWorktreeResult {
 interface RemoveWorktreeResult {
   success: boolean
   error?: string
+}
+
+// Transcription types
+interface TranscriptionSession {
+  id: string
+  title: string | null
+  raw_transcript: string
+  formatted_transcript: string | null
+  status: 'recording' | 'complete' | 'formatting'
+  duration_seconds: number
+  started_at: string
+  ended_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+type TranscriptionSessionInsert = Partial<Omit<TranscriptionSession, 'id' | 'created_at' | 'updated_at'>>
+type TranscriptionSessionUpdate = Partial<Omit<TranscriptionSession, 'id' | 'created_at'>>
+
+interface TranscriptionIndexEntry {
+  id: string
+  title: string | null
+  status: TranscriptionSession['status']
+  duration_seconds: number
+  created_at: string
+  preview: string
 }
 
 // Expose protected methods that allow the renderer process to use
@@ -286,10 +336,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // New intake/spec/plan workflow
     refineIntake: (rawIntake: string, journeyType: JourneyType, projectContext?: string) =>
       ipcRenderer.invoke('claude:refineIntake', { rawIntake, journeyType, projectContext }) as Promise<ClaudeCliResponse<RefinedIntake>>,
-    generateSpec: (refinedIntake: string, projectContext?: string, techStack?: string) =>
-      ipcRenderer.invoke('claude:generateSpec', { refinedIntake, projectContext, techStack }) as Promise<ClaudeCliResponse<Spec>>,
-    generatePlan: (spec: string, projectContext?: string) =>
-      ipcRenderer.invoke('claude:generatePlan', { spec, projectContext }) as Promise<ClaudeCliResponse<Plan>>,
+    generateSpec: (refinedIntake: string, projectContext?: string, techStack?: string, workingDirectory?: string) =>
+      ipcRenderer.invoke('claude:generateSpec', { refinedIntake, projectContext, techStack, workingDirectory }) as Promise<ClaudeCliResponse<Spec>>,
+    refineSpec: (currentSpec: string, feedback: string, workingDirectory?: string) =>
+      ipcRenderer.invoke('claude:refineSpec', { currentSpec, feedback, workingDirectory }) as Promise<ClaudeCliResponse<Spec>>,
+    generatePlan: (spec: string, projectContext?: string, workingDirectory?: string) =>
+      ipcRenderer.invoke('claude:generatePlan', { spec, projectContext, workingDirectory }) as Promise<ClaudeCliResponse<Plan>>,
+    refinePlan: (currentPlan: string, feedback: string, workingDirectory?: string) =>
+      ipcRenderer.invoke('claude:refinePlan', { currentPlan, feedback, workingDirectory }) as Promise<ClaudeCliResponse<Plan>>,
     // Legacy methods
     analyzeJourney: (description: string, projectContext?: string) =>
       ipcRenderer.invoke('claude:analyzeJourney', { description, projectContext }) as Promise<ClaudeCliResponse<JourneyAnalysis>>,
@@ -304,6 +358,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('claude:refineProjectIntake', { rawIntake, projectName }) as Promise<ClaudeCliResponse<ProjectIntakeRefinement>>,
     analyzeProjectIntakeChanges: (previousRaw: string, newRaw: string, existingAiDoc: string, projectName: string) =>
       ipcRenderer.invoke('claude:analyzeProjectIntakeChanges', { previousRaw, newRaw, existingAiDoc, projectName }) as Promise<ClaudeCliResponse<ProjectIntakeUpdate>>,
+    // Proposed journeys methods
+    generateProposedJourneys: (aiParsedIntake: string, projectName: string, existingProposals?: { name: string; description: string; status: string }[], codebasePath?: string) =>
+      ipcRenderer.invoke('claude:generateProposedJourneys', { aiParsedIntake, projectName, existingProposals, codebasePath }) as Promise<ClaudeCliResponse<ProposedJourneysResult>>,
+    // Proposed child journeys methods (for feature_planning journeys)
+    generateProposedChildJourneys: (spec: string, journeyName: string, existingProposals?: { name: string; description: string; status: string }[], codebasePath?: string) =>
+      ipcRenderer.invoke('claude:generateProposedChildJourneys', { spec, journeyName, existingProposals, codebasePath }) as Promise<ClaudeCliResponse<ProposedChildJourneysResult>>,
+    // Journey idea parsing methods
+    parseJourneyIdea: (rawText: string, projectName: string) =>
+      ipcRenderer.invoke('claude:parseJourneyIdea', { rawText, projectName }) as Promise<ClaudeCliResponse<ParsedJourneyIdea>>,
   },
 
   // VS Code Launcher API - Opens VS Code with Claude Code
@@ -339,6 +402,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('git:getStatus', worktreePath) as Promise<GitStatus | null>,
     getCurrentBranch: (worktreePath: string) =>
       ipcRenderer.invoke('git:getCurrentBranch', worktreePath) as Promise<string | null>,
+  },
+
+  // Transcriptions API - Local file-based speech-to-text session storage
+  transcriptions: {
+    getStoragePath: () =>
+      ipcRenderer.invoke('transcriptions:getStoragePath') as Promise<string>,
+    list: () =>
+      ipcRenderer.invoke('transcriptions:list') as Promise<TranscriptionIndexEntry[]>,
+    get: (id: string) =>
+      ipcRenderer.invoke('transcriptions:get', id) as Promise<TranscriptionSession | null>,
+    create: (data: TranscriptionSessionInsert) =>
+      ipcRenderer.invoke('transcriptions:create', data) as Promise<TranscriptionSession>,
+    update: (id: string, updates: TranscriptionSessionUpdate) =>
+      ipcRenderer.invoke('transcriptions:update', id, updates) as Promise<TranscriptionSession | null>,
+    delete: (id: string) =>
+      ipcRenderer.invoke('transcriptions:delete', id) as Promise<boolean>,
+    recoverCrashed: () =>
+      ipcRenderer.invoke('transcriptions:recoverCrashed') as Promise<string[]>,
   },
 })
 
@@ -377,8 +458,10 @@ declare global {
         queryJson: <T>(prompt: string, jsonSchema: string, options?: Partial<ClaudeCliRequest>) => Promise<ClaudeCliResponse<T>>
         // New intake/spec/plan workflow
         refineIntake: (rawIntake: string, journeyType: JourneyType, projectContext?: string) => Promise<ClaudeCliResponse<RefinedIntake>>
-        generateSpec: (refinedIntake: string, projectContext?: string, techStack?: string) => Promise<ClaudeCliResponse<Spec>>
-        generatePlan: (spec: string, projectContext?: string) => Promise<ClaudeCliResponse<Plan>>
+        generateSpec: (refinedIntake: string, projectContext?: string, techStack?: string, workingDirectory?: string) => Promise<ClaudeCliResponse<Spec>>
+        refineSpec: (currentSpec: string, feedback: string, workingDirectory?: string) => Promise<ClaudeCliResponse<Spec>>
+        generatePlan: (spec: string, projectContext?: string, workingDirectory?: string) => Promise<ClaudeCliResponse<Plan>>
+        refinePlan: (currentPlan: string, feedback: string, workingDirectory?: string) => Promise<ClaudeCliResponse<Plan>>
         // Legacy methods
         analyzeJourney: (description: string, projectContext?: string) => Promise<ClaudeCliResponse<JourneyAnalysis>>
         createPlan: (featureDescription: string, techStack: string, existingStructure?: string) => Promise<ClaudeCliResponse<ImplementationPlan>>
@@ -388,6 +471,12 @@ declare global {
         // Project intake methods
         refineProjectIntake: (rawIntake: string, projectName: string) => Promise<ClaudeCliResponse<ProjectIntakeRefinement>>
         analyzeProjectIntakeChanges: (previousRaw: string, newRaw: string, existingAiDoc: string, projectName: string) => Promise<ClaudeCliResponse<ProjectIntakeUpdate>>
+        // Proposed journeys methods
+        generateProposedJourneys: (aiParsedIntake: string, projectName: string, existingProposals?: { name: string; description: string; status: string }[], codebasePath?: string) => Promise<ClaudeCliResponse<ProposedJourneysResult>>
+        // Proposed child journeys methods (for feature_planning journeys)
+        generateProposedChildJourneys: (spec: string, journeyName: string, existingProposals?: { name: string; description: string; status: string }[], codebasePath?: string) => Promise<ClaudeCliResponse<ProposedChildJourneysResult>>
+        // Journey idea parsing methods
+        parseJourneyIdea: (rawText: string, projectName: string) => Promise<ClaudeCliResponse<ParsedJourneyIdea>>
       }
       vscode: {
         getStatus: () => Promise<VSCodeStatus>
@@ -408,6 +497,15 @@ declare global {
         removeWorktree: (options: { projectPath: string; worktreePath: string }) => Promise<RemoveWorktreeResult>
         getStatus: (worktreePath: string) => Promise<GitStatus | null>
         getCurrentBranch: (worktreePath: string) => Promise<string | null>
+      }
+      transcriptions: {
+        getStoragePath: () => Promise<string>
+        list: () => Promise<TranscriptionIndexEntry[]>
+        get: (id: string) => Promise<TranscriptionSession | null>
+        create: (data: TranscriptionSessionInsert) => Promise<TranscriptionSession>
+        update: (id: string, updates: TranscriptionSessionUpdate) => Promise<TranscriptionSession | null>
+        delete: (id: string) => Promise<boolean>
+        recoverCrashed: () => Promise<string[]>
       }
     }
   }

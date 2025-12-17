@@ -122,15 +122,16 @@ ${jsonSchema}`;
 
       const args = ['--print'];
 
-      // Extend PATH to include common npm global install locations
-      // Electron apps don't inherit shell PATH on macOS
+      // Extend PATH to include common install locations
+      // Electron apps don't inherit shell PATH or aliases on macOS
       const homedir = process.env.HOME || '';
       const extendedPath = [
+        `${homedir}/.claude/local`, // Claude Code CLI install location
         '/opt/homebrew/bin',
         '/usr/local/bin',
         `${homedir}/.npm-global/bin`,
         `${homedir}/.local/bin`,
-        `${homedir}/.nvm/versions/node/22/bin`, // Common nvm path
+        `${homedir}/.nvm/versions/node/v22.16.0/bin`, // Common nvm path
         process.env.PATH,
       ].filter(Boolean).join(':');
 
@@ -195,6 +196,18 @@ ${jsonSchema}`;
 
         // Try to parse as JSON if schema was provided
         const parsed = parseClaudeResponse(stdout, !!request.jsonSchema);
+
+        // If JSON parsing was expected but failed, return an error with context
+        if (request.jsonSchema && !parsed.success) {
+          const preview = stdout.slice(0, 300).replace(/\n/g, ' ');
+          resolve({
+            success: false,
+            error: `Failed to parse response as JSON. Preview: ${preview}...`,
+            rawOutput: stdout,
+            durationMs,
+          });
+          return;
+        }
 
         resolve({
           success: true,

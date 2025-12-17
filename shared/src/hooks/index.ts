@@ -1,6 +1,8 @@
 // Core hooks
 export { useProjects } from './useProjects';
 export { useJourneys } from './useJourneys';
+export { useProposedJourneys } from './useProposedJourneys';
+export { useProposedChildJourneys } from './useProposedChildJourneys';
 
 // Project targets
 export { useProjectTargets } from './useProjectTargets';

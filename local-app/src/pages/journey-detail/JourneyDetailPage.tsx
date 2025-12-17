@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useJourneys } from '@dev-orchestrator/shared'
-import type { Journey, JourneyUpdate } from '@dev-orchestrator/shared'
+import { useJourneys, useProjects } from '@dev-orchestrator/shared'
+import type { JourneyUpdate } from '@dev-orchestrator/shared'
+import { useVSCodeLaunch } from '../../hooks/useVSCodeLaunch'
 import { Button } from '../../components/common/Button'
+import { ToastContainer, ToastData } from '../../components/common/Toast'
 import {
   TabNavigation,
   OverviewTab,
@@ -12,23 +14,70 @@ import {
   LinksTab,
   type JourneyTab,
 } from '../../components/journeys/detail-tabs'
+import { SpeechToText } from '../../components/SpeechToText'
 
 interface JourneyTabData {
   journeyId: string
   projectId: string
 }
 
+interface JourneyDetailState {
+  tabs: JourneyTabData[]
+  activeTabId: string | null
+  activeContentTab: JourneyTab
+}
+
+const JOURNEY_DETAIL_STORAGE_KEY = 'journeyDetailState'
+
+function loadSavedContentTab(): JourneyTab {
+  try {
+    const saved = localStorage.getItem(JOURNEY_DETAIL_STORAGE_KEY)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      return parsed.activeContentTab || 'overview'
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return 'overview'
+}
+
 export function JourneyDetailPage() {
+  // Only restore content tab from localStorage - journey tabs come from IPC events
   const [tabs, setTabs] = useState<JourneyTabData[]>([])
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
-  const [activeContentTab, setActiveContentTab] = useState<JourneyTab>('overview')
+  const [activeContentTab, setActiveContentTab] = useState<JourneyTab>(loadSavedContentTab())
+  const [toasts, setToasts] = useState<ToastData[]>([])
+  const [ipcInitialized, setIpcInitialized] = useState(false)
 
   // Get the active tab's projectId for the useJourneys hook
   const activeTab = tabs.find(t => t.journeyId === activeTabId)
   const { journeys, updateJourney, loading } = useJourneys(activeTab?.projectId)
+  const { projects } = useProjects()
+  const { launchForJourney } = useVSCodeLaunch()
 
   // Get the active journey from the journeys list
   const activeJourney = journeys.find(j => j.id === activeTabId) || null
+
+  // Get the project for the active journey
+  const activeProject = projects.find(p => p.id === activeTab?.projectId) || null
+
+  // Persist only content tab to localStorage (journey tabs are managed by main process)
+  useEffect(() => {
+    localStorage.setItem(JOURNEY_DETAIL_STORAGE_KEY, JSON.stringify({
+      activeContentTab,
+    }))
+  }, [activeContentTab])
+
+  // Toast helpers
+  const showToast = useCallback((message: string, type: ToastData['type'] = 'error') => {
+    const id = `toast-${Date.now()}`
+    setToasts(prev => [...prev, { id, message, type }])
+  }, [])
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id))
+  }, [])
 
   // Listen for IPC events from main process
   useEffect(() => {
@@ -39,6 +88,7 @@ export function JourneyDetailPage() {
       console.log('Journey detail init:', data)
       setTabs([data])
       setActiveTabId(data.journeyId)
+      setIpcInitialized(true)
     })
 
     // Add new tab
@@ -52,6 +102,7 @@ export function JourneyDetailPage() {
         return [...prev, data]
       })
       setActiveTabId(data.journeyId)
+      setIpcInitialized(true)
     })
 
     // Focus existing tab
@@ -69,6 +120,8 @@ export function JourneyDetailPage() {
       // If we're closing the active tab, switch to another
       if (activeTabId === journeyId && newTabs.length > 0) {
         setActiveTabId(newTabs[newTabs.length - 1].journeyId)
+      } else if (newTabs.length === 0) {
+        setActiveTabId(null)
       }
 
       // Notify main process
@@ -84,6 +137,33 @@ export function JourneyDetailPage() {
     await updateJourney(activeJourney.id, updates)
   }, [activeJourney, updateJourney])
 
+  // Handle stage change (auto-advance when AI generation completes)
+  const handleStageChange = useCallback(async (newStage: string) => {
+    if (!activeJourney) return
+    // Only advance if it's actually a later stage
+    await updateJourney(activeJourney.id, { stage: newStage as JourneyUpdate['stage'] })
+    showToast(`Stage advanced to: ${newStage.replace(/_/g, ' ')}`, 'success')
+  }, [activeJourney, updateJourney, showToast])
+
+  // Handle opening in VS Code
+  const handleOpenInVSCode = useCallback(async () => {
+    if (!activeJourney || !activeProject) {
+      showToast('Journey or project not found', 'error')
+      return
+    }
+
+    try {
+      const result = await launchForJourney(activeJourney, activeProject)
+      if (!result.success) {
+        showToast(result.error || 'Failed to open VS Code', 'error')
+      } else if (result.isNewSession) {
+        showToast('Started new session', 'success')
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to open VS Code', 'error')
+    }
+  }, [activeJourney, activeProject, launchForJourney, showToast])
+
   // Render content tabs
   const renderTabContent = () => {
     if (!activeJourney) return null
@@ -92,11 +172,11 @@ export function JourneyDetailPage() {
       case 'overview':
         return <OverviewTab journey={activeJourney} onUpdate={handleUpdate} />
       case 'intake':
-        return <IntakeTab journey={activeJourney} />
+        return <IntakeTab journey={activeJourney} onStageChange={handleStageChange} />
       case 'spec':
-        return <SpecTab journey={activeJourney} />
+        return <SpecTab journey={activeJourney} project={activeProject} onStageChange={handleStageChange} />
       case 'plan':
-        return <PlanTab journey={activeJourney} />
+        return <PlanTab journey={activeJourney} project={activeProject} onStageChange={handleStageChange} />
       case 'checklists':
         return <ChecklistsTab journey={activeJourney} />
       case 'links':
@@ -112,10 +192,13 @@ export function JourneyDetailPage() {
     return journey?.name || 'Loading...'
   }
 
-  if (tabs.length === 0) {
+  // Show waiting state until IPC sends journey data
+  if (!ipcInitialized || tabs.length === 0) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-gray-500 dark:text-gray-400">Waiting for journey data...</div>
+        <div className="text-gray-500 dark:text-gray-400">
+          {ipcInitialized ? 'No journeys open' : 'Waiting for journey data...'}
+        </div>
       </div>
     )
   }
@@ -190,7 +273,7 @@ export function JourneyDetailPage() {
           </div>
 
           {/* Content Tab Navigation */}
-          <TabNavigation activeTab={activeContentTab} onTabChange={setActiveContentTab} />
+          <TabNavigation activeTab={activeContentTab} onTabChange={setActiveContentTab} journeyType={activeJourney.type} />
 
           {/* Tab Content */}
           <div className="flex-1 overflow-y-auto p-4">
@@ -200,7 +283,7 @@ export function JourneyDetailPage() {
           {/* Actions Footer */}
           <div className="border-t border-gray-200 dark:border-gray-700 p-4 shrink-0">
             <div className="flex gap-2">
-              <Button variant="secondary" className="flex-1">
+              <Button variant="secondary" className="flex-1" onClick={handleOpenInVSCode}>
                 <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M17.5 0h-11L0 6v12l6.5 6h11L24 18V6L17.5 0zm-7.17 17.89L4.5 12l5.83-5.89 1.34 1.32L7.17 12l4.5 4.57-1.34 1.32zm3.34 0l-1.34-1.32L16.83 12l-4.5-4.57 1.34-1.32L19.5 12l-5.83 5.89z"/>
                 </svg>
@@ -216,6 +299,9 @@ export function JourneyDetailPage() {
           </div>
         </>
       )}
+
+      <SpeechToText />
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   )
 }

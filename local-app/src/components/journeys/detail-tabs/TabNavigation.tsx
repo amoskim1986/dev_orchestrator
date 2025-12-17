@@ -1,9 +1,12 @@
+import type { JourneyType } from '@dev-orchestrator/shared'
+
 export type JourneyTab = 'overview' | 'intake' | 'spec' | 'plan' | 'checklists' | 'links'
 
 interface TabConfig {
   id: JourneyTab
   label: string
   badge?: string | number
+  hiddenForTypes?: JourneyType[]
 }
 
 const TABS: TabConfig[] = [
@@ -11,7 +14,7 @@ const TABS: TabConfig[] = [
   { id: 'intake', label: 'Intake' },
   { id: 'spec', label: 'Spec' },
   { id: 'plan', label: 'Plan' },
-  { id: 'checklists', label: 'Checklists' },
+  { id: 'checklists', label: 'Checklists', hiddenForTypes: ['feature_planning'] },
   { id: 'links', label: 'Links' },
 ]
 
@@ -19,12 +22,19 @@ interface TabNavigationProps {
   activeTab: JourneyTab
   onTabChange: (tab: JourneyTab) => void
   badges?: Partial<Record<JourneyTab, string | number>>
+  journeyType?: JourneyType
 }
 
-export function TabNavigation({ activeTab, onTabChange, badges = {} }: TabNavigationProps) {
+export function TabNavigation({ activeTab, onTabChange, badges = {}, journeyType }: TabNavigationProps) {
+  // Filter tabs based on journey type
+  const visibleTabs = TABS.filter(tab => {
+    if (!tab.hiddenForTypes || !journeyType) return true
+    return !tab.hiddenForTypes.includes(journeyType)
+  })
+
   return (
     <div className="flex border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
-      {TABS.map((tab) => {
+      {visibleTabs.map((tab) => {
         const badge = badges[tab.id]
         return (
           <button

@@ -8,6 +8,7 @@ interface SidebarProps {
 const tabs = [
   { id: 'dashboard', label: 'Dashboard', icon: '~' },
   { id: 'history', label: 'History', icon: 'H' },
+  { id: 'transcriptions', label: 'Transcriptions', icon: 'T' },
   { id: 'projects', label: 'Projects', icon: 'P' },
   { id: 'journeys', label: 'Journeys', icon: 'J' },
 ]

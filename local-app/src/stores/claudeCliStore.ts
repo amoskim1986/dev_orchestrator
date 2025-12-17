@@ -52,6 +52,21 @@ interface ProjectIntakeUpdate {
   updated_document: string
 }
 
+interface ProposedJourneysResult {
+  journeys: {
+    name: string
+    description: string
+    early_plan: string
+  }[]
+}
+
+interface ParsedJourneyIdea {
+  name: string
+  description: string
+  early_plan: string
+  type: 'feature_planning' | 'feature' | 'bug' | 'investigation'
+}
+
 interface ClaudeCliState {
   // Status
   isProcessing: boolean
@@ -66,6 +81,8 @@ interface ClaudeCliState {
   lastSummary: JourneySummary | null
   lastProjectIntakeRefinement: ProjectIntakeRefinement | null
   lastProjectIntakeUpdate: ProjectIntakeUpdate | null
+  lastProposedJourneys: ProposedJourneysResult | null
+  lastParsedJourneyIdea: ParsedJourneyIdea | null
 
   // Actions
   analyzeJourney: (description: string, projectContext?: string) => Promise<JourneyAnalysis | null>
@@ -76,6 +93,10 @@ interface ClaudeCliState {
   // Project intake actions
   refineProjectIntake: (rawIntake: string, projectName: string) => Promise<ProjectIntakeRefinement | null>
   analyzeProjectIntakeChanges: (previousRaw: string, newRaw: string, existingAiDoc: string, projectName: string) => Promise<ProjectIntakeUpdate | null>
+  // Proposed journeys actions
+  generateProposedJourneys: (aiParsedIntake: string, projectName: string, existingProposals?: { name: string; description: string; status: string }[], codebasePath?: string) => Promise<ProposedJourneysResult | null>
+  // Journey idea parsing actions
+  parseJourneyIdea: (rawText: string, projectName: string) => Promise<ParsedJourneyIdea | null>
   refreshStatus: () => Promise<void>
   clearQueue: () => Promise<number>
   clearError: () => void
@@ -93,6 +114,8 @@ export const useClaudeCliStore = create<ClaudeCliState>((set, get) => ({
   lastSummary: null,
   lastProjectIntakeRefinement: null,
   lastProjectIntakeUpdate: null,
+  lastProposedJourneys: null,
+  lastParsedJourneyIdea: null,
 
   // Analyze a journey idea
   analyzeJourney: async (description: string, projectContext?: string) => {
@@ -225,6 +248,44 @@ export const useClaudeCliStore = create<ClaudeCliState>((set, get) => ({
     }
   },
 
+  // Generate proposed journeys from project intake
+  generateProposedJourneys: async (aiParsedIntake: string, projectName: string, existingProposals?: { name: string; description: string; status: string }[], codebasePath?: string) => {
+    set({ isProcessing: true, lastError: null })
+    try {
+      const response = await window.electronAPI.claude.generateProposedJourneys(aiParsedIntake, projectName, existingProposals, codebasePath)
+      set({
+        isProcessing: false,
+        lastDurationMs: response.durationMs,
+        lastProposedJourneys: response.success ? response.data ?? null : null,
+        lastError: response.success ? null : response.error ?? 'Unknown error',
+      })
+      return response.success ? response.data ?? null : null
+    } catch (err) {
+      const error = (err as Error).message
+      set({ isProcessing: false, lastError: error })
+      return null
+    }
+  },
+
+  // Parse raw journey idea into structured format
+  parseJourneyIdea: async (rawText: string, projectName: string) => {
+    set({ isProcessing: true, lastError: null })
+    try {
+      const response = await window.electronAPI.claude.parseJourneyIdea(rawText, projectName)
+      set({
+        isProcessing: false,
+        lastDurationMs: response.durationMs,
+        lastParsedJourneyIdea: response.success ? response.data ?? null : null,
+        lastError: response.success ? null : response.error ?? 'Unknown error',
+      })
+      return response.success ? response.data ?? null : null
+    } catch (err) {
+      const error = (err as Error).message
+      set({ isProcessing: false, lastError: error })
+      return null
+    }
+  },
+
   // Refresh service status
   refreshStatus: async () => {
     try {
@@ -256,4 +317,4 @@ export const useClaudeCliStore = create<ClaudeCliState>((set, get) => ({
 }))
 
 // Export types for consumers
-export type { JourneyAnalysis, ImplementationPlan, JourneySummary, ClaudeCliResponse, ProjectIntakeRefinement, ProjectIntakeUpdate }
+export type { JourneyAnalysis, ImplementationPlan, JourneySummary, ClaudeCliResponse, ProjectIntakeRefinement, ProjectIntakeUpdate, ProposedJourneysResult, ParsedJourneyIdea }

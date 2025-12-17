@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, Menu } from 'electron'
 import path from 'path'
 import { registerHistoryIpc } from './ipc/history.ipc'
 import { registerDialogIpc } from './ipc/dialog.ipc'
@@ -7,6 +7,7 @@ import { registerVSCodeLauncherIpc } from './ipc/vscode-launcher.ipc'
 import { registerGitIpc } from './ipc/git.ipc'
 import { registerProjectDetailIpc } from './ipc/project-detail.ipc'
 import { registerJourneyDetailIpc } from './ipc/journey-detail.ipc'
+import { registerTranscriptionsIpc } from './ipc/transcriptions.ipc'
 
 // Handle uncaught exceptions gracefully (e.g., EPIPE from child processes)
 process.on('uncaughtException', (error) => {
@@ -35,6 +36,84 @@ if (!gotTheLock) {
 }
 
 let mainWindow: BrowserWindow | null = null
+
+function createMenu() {
+  const isMac = process.platform === 'darwin'
+
+  const template: Electron.MenuItemConstructorOptions[] = [
+    // App menu (macOS only)
+    ...(isMac ? [{
+      label: app.name,
+      submenu: [
+        { role: 'about' as const },
+        { type: 'separator' as const },
+        { role: 'services' as const },
+        { type: 'separator' as const },
+        { role: 'hide' as const },
+        { role: 'hideOthers' as const },
+        { role: 'unhide' as const },
+        { type: 'separator' as const },
+        { role: 'quit' as const },
+      ]
+    }] : []),
+    // Edit menu
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' },
+      ]
+    },
+    // View menu
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' },
+      ]
+    },
+    // Window menu
+    {
+      label: 'Window',
+      submenu: [
+        {
+          label: 'Keep on Top',
+          type: 'checkbox',
+          accelerator: isMac ? 'Cmd+Shift+T' : 'Ctrl+Shift+T',
+          click: (menuItem, browserWindow) => {
+            if (browserWindow) {
+              browserWindow.setAlwaysOnTop(menuItem.checked)
+            }
+          }
+        },
+        { type: 'separator' },
+        { role: 'minimize' },
+        { role: 'zoom' },
+        ...(isMac ? [
+          { type: 'separator' as const },
+          { role: 'front' as const },
+        ] : [
+          { role: 'close' as const },
+        ]),
+      ]
+    },
+  ]
+
+  const menu = Menu.buildFromTemplate(template)
+  Menu.setApplicationMenu(menu)
+}
 
 function createWindow() {
   // Use VITE_DEV_SERVER_URL env var set by electron-vite
@@ -84,6 +163,9 @@ app.whenReady().then(async () => {
     app.dock.setIcon(path.join(__dirname, '../../resources/icon.png'))
   }
 
+  // Create application menu
+  createMenu()
+
   // Register IPC handlers
   registerHistoryIpc()
   registerDialogIpc()
@@ -92,6 +174,7 @@ app.whenReady().then(async () => {
   registerGitIpc()
   registerProjectDetailIpc()
   registerJourneyDetailIpc()
+  registerTranscriptionsIpc()
 
   // Dynamically import terminal IPC to avoid app.isPackaged at module load time
   const { registerTerminalIpc } = await import('./ipc/terminal.ipc')

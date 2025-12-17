@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import type { Journey, JourneyStage, JourneyUpdate } from '../../../types'
-import { getStagesForType } from '@dev-orchestrator/shared'
 import { TypeBadge } from '../TypeBadge'
-import { StageBadge, StageProgress } from '../StageBadge'
+import { StageRow } from '../StageRow'
 import { Button } from '../../common/Button'
 import { Input } from '../../common/Input'
 
@@ -45,18 +44,6 @@ export function OverviewTab({ journey, onUpdate }: OverviewTabProps) {
   const [editTags, setEditTags] = useState(journey.tags?.join(', ') || '')
   const [isSaving, setIsSaving] = useState(false)
 
-  const stages = getStagesForType(journey.type)
-  const currentStageIndex = stages.indexOf(journey.stage)
-  const nextStage = currentStageIndex < stages.length - 1 ? stages[currentStageIndex + 1] : null
-  const prevStage = currentStageIndex > 0 ? stages[currentStageIndex - 1] : null
-
-  const formatStageLabel = (stage: string) => {
-    return stage
-      .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ')
-  }
-
   const handleSave = async () => {
     setIsSaving(true)
     try {
@@ -92,54 +79,9 @@ export function OverviewTab({ journey, onUpdate }: OverviewTabProps) {
 
   return (
     <div className="space-y-6">
-      {/* Type & Stage Badges */}
+      {/* Type Badge */}
       <div className="flex items-center gap-2">
         <TypeBadge type={journey.type} />
-        <StageBadge stage={journey.stage} type={journey.type} />
-      </div>
-
-      {/* Stage Progress */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Stage Progress</h3>
-          <span className="text-xs text-gray-500">
-            {currentStageIndex + 1} of {stages.length}
-          </span>
-        </div>
-        <StageProgress stage={journey.stage} type={journey.type} />
-
-        {/* Stage description */}
-        <p className="text-sm text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800/50 rounded-lg p-3">
-          {stageDescriptions[journey.stage] || 'Working on this stage'}
-        </p>
-
-        {/* Stage Navigation */}
-        <div className="flex gap-2">
-          {prevStage && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => handleStageChange(prevStage as JourneyStage)}
-            >
-              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              {formatStageLabel(prevStage)}
-            </Button>
-          )}
-          {nextStage && (
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => handleStageChange(nextStage as JourneyStage)}
-            >
-              {formatStageLabel(nextStage)}
-              <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Button>
-          )}
-        </div>
       </div>
 
       {/* Name (editable) */}
@@ -172,6 +114,21 @@ export function OverviewTab({ journey, onUpdate }: OverviewTabProps) {
             {journey.description || 'No description'}
           </p>
         )}
+      </div>
+
+      {/* Stage Row */}
+      <div className="space-y-2">
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Stage</h3>
+        <StageRow
+          type={journey.type}
+          stage={journey.stage}
+          onStageChange={handleStageChange}
+          size="md"
+        />
+        {/* Stage description */}
+        <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+          {stageDescriptions[journey.stage] || 'Working on this stage'}
+        </p>
       </div>
 
       {/* Source URL */}

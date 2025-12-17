@@ -5,17 +5,57 @@ import { Button } from '../../common/Button'
 
 interface IntakeTabProps {
   journey: Journey
+  onStageChange?: (newStage: string) => void
 }
 
 type SubTab = 'raw' | 'refined'
 
-export function IntakeTab({ journey }: IntakeTabProps) {
-  const { intakes, loading, error, createIntake, getLatestIntake, refetch } = useJourneyIntakes(journey.id)
+// Format the structured refined intake into a readable string
+function formatRefinedIntake(refined: {
+  title: string
+  problem: string
+  proposedSolution: string
+  userStories: string[]
+  acceptanceCriteria: string[]
+  outOfScope: string[]
+  openQuestions: string[]
+}): string {
+  const sections: string[] = []
+
+  sections.push(`# ${refined.title}\n`)
+
+  sections.push(`## Problem\n${refined.problem}\n`)
+
+  sections.push(`## Proposed Solution\n${refined.proposedSolution}\n`)
+
+  if (refined.userStories.length > 0) {
+    sections.push(`## User Stories\n${refined.userStories.map(s => `- ${s}`).join('\n')}\n`)
+  }
+
+  if (refined.acceptanceCriteria.length > 0) {
+    sections.push(`## Acceptance Criteria\n${refined.acceptanceCriteria.map(c => `- ${c}`).join('\n')}\n`)
+  }
+
+  if (refined.outOfScope.length > 0) {
+    sections.push(`## Out of Scope\n${refined.outOfScope.map(o => `- ${o}`).join('\n')}\n`)
+  }
+
+  if (refined.openQuestions.length > 0) {
+    sections.push(`## Open Questions\n${refined.openQuestions.map(q => `- ${q}`).join('\n')}\n`)
+  }
+
+  return sections.join('\n')
+}
+
+export function IntakeTab({ journey, onStageChange }: IntakeTabProps) {
+  const { intakes, loading, error, createIntake, updateIntake, getLatestIntake, refetch } = useJourneyIntakes(journey.id)
 
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('raw')
   const [rawContent, setRawContent] = useState('')
   const [isDirty, setIsDirty] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isRefining, setIsRefining] = useState(false)
+  const [refineError, setRefineError] = useState<string | null>(null)
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null)
 
   const latestIntake = getLatestIntake()
@@ -49,15 +89,50 @@ export function IntakeTab({ journey }: IntakeTabProps) {
     setIsSaving(true)
     try {
       // Create a new version
-      await createIntake(rawContent.trim())
+      const newIntake = await createIntake(rawContent.trim())
       await refetch()
       setIsDirty(false)
-      // Select the new version (will be highest)
-      setSelectedVersion(null) // Reset to trigger latest selection
+      // Select the new version directly
+      setSelectedVersion(newIntake.version)
     } catch (err) {
       console.error('Failed to save intake:', err)
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleRefine = async () => {
+    if (!currentIntake?.raw_content) return
+
+    setIsRefining(true)
+    setRefineError(null)
+
+    try {
+      const result = await window.electronAPI.claude.refineIntake(
+        currentIntake.raw_content,
+        journey.type
+      )
+
+      if (!result.success || !result.data) {
+        setRefineError(result.error || 'Failed to refine intake')
+        return
+      }
+
+      // Format the structured response into readable text
+      const refinedText = formatRefinedIntake(result.data)
+
+      // Update the intake with the refined content
+      await updateIntake(currentIntake.id, { refined_content: refinedText })
+      await refetch()
+
+      // Switch to refined tab to show the result
+      setActiveSubTab('refined')
+      // Note: Stage advancement to 'speccing' happens when spec is generated, not when intake is refined
+    } catch (err) {
+      console.error('Failed to refine intake:', err)
+      setRefineError(err instanceof Error ? err.message : 'Failed to refine intake')
+    } finally {
+      setIsRefining(false)
     }
   }
 
@@ -173,10 +248,25 @@ export function IntakeTab({ journey }: IntakeTabProps) {
         ) : (
           <>
             {currentIntake?.refined_content ? (
-              <div className="flex-1 overflow-y-auto">
-                <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 rounded-lg p-4 font-mono">
-                  {currentIntake.refined_content}
-                </pre>
+              <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="flex-1 overflow-y-auto">
+                  <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 rounded-lg p-4 font-mono">
+                    {currentIntake.refined_content}
+                  </pre>
+                </div>
+                <div className="flex items-center justify-end mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                  {refineError && (
+                    <p className="text-xs text-red-500 mr-4">{refineError}</p>
+                  )}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={isRefining}
+                    onClick={handleRefine}
+                  >
+                    {isRefining ? 'Re-refining...' : 'Re-refine with AI'}
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-gray-500 dark:text-gray-400">
@@ -187,18 +277,17 @@ export function IntakeTab({ journey }: IntakeTabProps) {
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                   Save raw intake first, then use AI to refine
                 </p>
-                {/* TODO: Add AI refine button when hook is ready */}
+                {refineError && (
+                  <p className="text-xs text-red-500 mt-2">{refineError}</p>
+                )}
                 <Button
                   variant="secondary"
                   size="sm"
                   className="mt-4"
-                  disabled={!currentIntake?.raw_content}
-                  onClick={() => {
-                    // TODO: Trigger AI refinement
-                    console.log('AI refinement not yet implemented')
-                  }}
+                  disabled={!currentIntake?.raw_content || isRefining}
+                  onClick={handleRefine}
                 >
-                  Refine with AI
+                  {isRefining ? 'Refining...' : 'Refine with AI'}
                 </Button>
               </div>
             )}

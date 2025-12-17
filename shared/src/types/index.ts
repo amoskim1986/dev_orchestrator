@@ -5,7 +5,7 @@
 export type JourneyType = 'bug' | 'feature' | 'feature_planning' | 'investigation';
 
 // Stage types per journey type
-export type FeaturePlanningStage = 'intake' | 'speccing' | 'ui_planning' | 'planning' | 'review' | 'approved';
+export type FeaturePlanningStage = 'intake' | 'speccing' | 'ui_planning' | 'planning' | 'complete';
 export type FeatureStage = 'review_and_edit_plan' | 'implementing' | 'testing' | 'pre_prod_review' | 'merge_approved' | 'staging_qa' | 'deployed';
 export type InvestigationStage = 'intake' | 'speccing' | 'planning' | 'approved' | 'in_progress' | 'complete';
 export type BugStage = 'reported' | 'investigating' | 'fixing' | 'testing' | 'pre_prod_review' | 'merge_approved' | 'staging_qa' | 'deployed';
@@ -44,6 +44,57 @@ export type SessionStatus = 'active' | 'ended' | 'crashed' | 'abandoned';
 export type ProcessStatus = 'running' | 'stopped' | 'crashed';
 
 // =============================================================================
+// PROPOSED PROJECT JOURNEY TYPES
+// =============================================================================
+
+export type ProposedJourneyStatus = 'draft' | 'generated' | 'rejected' | 'punted' | 'cancelled' | 'already_completed';
+
+export interface ProposedProjectJourney {
+  id: string;
+  name: string;
+  description: string;
+  early_plan: string;
+  status: ProposedJourneyStatus;
+  generated_journey_id: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  cancelled_at: string | null;
+}
+
+export type ProposedJourneyInsert = Omit<ProposedProjectJourney, 'id' | 'created_at' | 'updated_at' | 'cancelled_at'> & {
+  id?: string;
+  cancelled_at?: string | null;
+};
+
+export type ProposedJourneyUpdate = Partial<Omit<ProposedProjectJourney, 'id' | 'created_at'>>;
+
+// =============================================================================
+// PROPOSED CHILD JOURNEY TYPES (for feature_planning journeys)
+// =============================================================================
+
+export interface ProposedChildJourney {
+  id: string;
+  name: string;
+  description: string;
+  early_plan: string;
+  checklist_items: string[];  // Todo items for the child journey
+  status: ProposedJourneyStatus;
+  generated_journey_id: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  cancelled_at: string | null;
+}
+
+export type ProposedChildJourneyInsert = Omit<ProposedChildJourney, 'id' | 'created_at' | 'updated_at' | 'cancelled_at'> & {
+  id?: string;
+  cancelled_at?: string | null;
+};
+
+export type ProposedChildJourneyUpdate = Partial<Omit<ProposedChildJourney, 'id' | 'created_at'>>;
+
+// =============================================================================
 // DATABASE ROW TYPES
 // =============================================================================
 
@@ -60,6 +111,7 @@ export interface Project {
   ai_parsed_intake: string | null;
   ai_parsed_at: string | null;
   intake_updated_at: string | null;
+  proposed_project_journeys: ProposedProjectJourney[];
   created_at: string;
   updated_at: string;
 }
@@ -92,6 +144,7 @@ export interface Journey {
   depends_on_journey_id: string | null;
   branch_name: string | null;
   worktree_path: string | null;
+  proposed_child_journeys: ProposedChildJourney[];  // For feature_planning journeys
   created_at: string;
   updated_at: string;
 }
@@ -195,6 +248,7 @@ export type ProjectInsert = Omit<Project, 'id' | 'created_at' | 'updated_at'> & 
   ai_parsed_intake?: string | null;
   ai_parsed_at?: string | null;
   intake_updated_at?: string | null;
+  proposed_project_journeys?: ProposedProjectJourney[];
 };
 
 export type ProjectTargetInsert = {
@@ -221,6 +275,7 @@ export type JourneyInsert = {
   depends_on_journey_id?: string | null;
   branch_name?: string | null;
   worktree_path?: string | null;
+  proposed_child_journeys?: ProposedChildJourney[];
 };
 
 export type JourneyIntakeInsert = {
@@ -306,7 +361,7 @@ export type SessionAiToolUpdate = Partial<Omit<SessionAiTool, 'id' | 'session_id
 // =============================================================================
 
 // Stage validators per journey type
-export const FEATURE_PLANNING_STAGES: FeaturePlanningStage[] = ['intake', 'speccing', 'ui_planning', 'planning', 'review', 'approved'];
+export const FEATURE_PLANNING_STAGES: FeaturePlanningStage[] = ['intake', 'speccing', 'ui_planning', 'planning', 'complete'];
 export const FEATURE_STAGES: FeatureStage[] = ['review_and_edit_plan', 'implementing', 'testing', 'pre_prod_review', 'merge_approved', 'staging_qa', 'deployed'];
 export const INVESTIGATION_STAGES: InvestigationStage[] = ['intake', 'speccing', 'planning', 'approved', 'in_progress', 'complete'];
 export const BUG_STAGES: BugStage[] = ['reported', 'investigating', 'fixing', 'testing', 'pre_prod_review', 'merge_approved', 'staging_qa', 'deployed'];

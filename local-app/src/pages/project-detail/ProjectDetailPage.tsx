@@ -1,8 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useProjects } from '@dev-orchestrator/shared'
-import type { Project, ProjectUpdate } from '@dev-orchestrator/shared'
+import { useProjects, useJourneys } from '@dev-orchestrator/shared'
+import type { Project, ProjectUpdate, JourneyInsert, Journey } from '@dev-orchestrator/shared'
 import { ProjectIntakeEditor } from '../../components/projects/ProjectIntakeEditor'
 import { IntakeChangesDialog } from '../../components/projects/IntakeChangesDialog'
+import { ProposedJourneysTab } from '../../components/projects/ProposedJourneysTab'
+import { SpeechToText } from '../../components/SpeechToText'
+
+type ProjectTab = 'description' | 'journeys'
 
 interface ChangesDialogData {
   changesSummary: string
@@ -12,13 +16,54 @@ interface ChangesDialogData {
   onKeepCurrent: () => Promise<void>
 }
 
+const PROJECT_DETAIL_STORAGE_KEY = 'projectDetailState'
+
 export function ProjectDetailPage() {
   const { projects, updateProject, loading } = useProjects()
-  const [projectId, setProjectId] = useState<string | null>(null)
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
+  const [editTitle, setEditTitle] = useState('')
+  const [projectId, setProjectId] = useState<string | null>(() => {
+    // Restore from localStorage on initial mount (handles refresh)
+    try {
+      const saved = localStorage.getItem(PROJECT_DETAIL_STORAGE_KEY)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        return parsed.projectId || null
+      }
+    } catch {
+      // Ignore parse errors
+    }
+    return null
+  })
+  const [activeTab, setActiveTab] = useState<ProjectTab>(() => {
+    try {
+      const saved = localStorage.getItem(PROJECT_DETAIL_STORAGE_KEY)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        return parsed.activeTab || 'description'
+      }
+    } catch {
+      // Ignore parse errors
+    }
+    return 'description'
+  })
   const [changesDialog, setChangesDialog] = useState<ChangesDialogData | null>(null)
+
+  // Get journeys for this project (for the proposed journeys tab)
+  const { journeys, createJourney, loading: journeysLoading } = useJourneys(projectId || undefined)
 
   // Get the project from the list
   const project = projects.find(p => p.id === projectId) || null
+
+  // Persist state to localStorage when it changes
+  useEffect(() => {
+    if (projectId) {
+      localStorage.setItem(PROJECT_DETAIL_STORAGE_KEY, JSON.stringify({
+        projectId,
+        activeTab,
+      }))
+    }
+  }, [projectId, activeTab])
 
   // Listen for project init from main process
   useEffect(() => {
@@ -42,6 +87,10 @@ export function ProjectDetailPage() {
     await updateProject(project.id, updates)
   }, [project, updateProject])
 
+  const handleCreateJourney = useCallback(async (insert: JourneyInsert): Promise<Journey> => {
+    return createJourney(insert)
+  }, [createJourney])
+
   const handleShowChangesDialog = useCallback((data: ChangesDialogData) => {
     setChangesDialog(data)
   }, [])
@@ -50,7 +99,34 @@ export function ProjectDetailPage() {
     setChangesDialog(null)
   }, [])
 
-  if (loading) {
+  const handleTitleClick = useCallback(() => {
+    if (project) {
+      setEditTitle(project.name)
+      setIsEditingTitle(true)
+    }
+  }, [project])
+
+  const handleTitleSave = useCallback(async () => {
+    if (!project || !editTitle.trim()) {
+      setIsEditingTitle(false)
+      return
+    }
+    if (editTitle.trim() !== project.name) {
+      await updateProject(project.id, { name: editTitle.trim() })
+    }
+    setIsEditingTitle(false)
+  }, [project, editTitle, updateProject])
+
+  const handleTitleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleTitleSave()
+    } else if (e.key === 'Escape') {
+      setIsEditingTitle(false)
+    }
+  }, [handleTitleSave])
+
+  if (loading || journeysLoading) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-gray-500 dark:text-gray-400">Loading project...</div>
@@ -86,8 +162,26 @@ export function ProjectDetailPage() {
 
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{project.name}</h2>
+        <div className="flex-1 min-w-0">
+          {isEditingTitle ? (
+            <input
+              type="text"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              onBlur={handleTitleSave}
+              onKeyDown={handleTitleKeyDown}
+              autoFocus
+              className="w-full text-lg font-semibold text-gray-900 dark:text-white bg-transparent border-b-2 border-blue-500 outline-none"
+            />
+          ) : (
+            <h2
+              onClick={handleTitleClick}
+              className="text-lg font-semibold text-gray-900 dark:text-white cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              title="Click to edit title"
+            >
+              {project.name}
+            </h2>
+          )}
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{project.root_path}</p>
         </div>
         <span className={`text-xs px-2 py-1 rounded ${
@@ -119,13 +213,51 @@ export function ProjectDetailPage() {
         </div>
       </div>
 
-      {/* Intake Editor - takes remaining space */}
+      {/* Tab Navigation */}
+      <div className="flex border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-transparent px-4 shrink-0">
+        <button
+          onClick={() => setActiveTab('description')}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'description'
+              ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
+          }`}
+        >
+          Description
+        </button>
+        <button
+          onClick={() => setActiveTab('journeys')}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'journeys'
+              ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
+          }`}
+        >
+          Journeys
+          {(project.proposed_project_journeys?.length ?? 0) > 0 && (
+            <span className="ml-1.5 text-xs bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded-full">
+              {project.proposed_project_journeys?.length ?? 0}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Tab Content - takes remaining space */}
       <div className="flex-1 overflow-hidden">
-        <ProjectIntakeEditor
-          project={project}
-          onUpdate={handleUpdate}
-          onShowChangesDialog={handleShowChangesDialog}
-        />
+        {activeTab === 'description' ? (
+          <ProjectIntakeEditor
+            project={project}
+            onUpdate={handleUpdate}
+            onShowChangesDialog={handleShowChangesDialog}
+          />
+        ) : (
+          <ProposedJourneysTab
+            project={project}
+            journeys={journeys}
+            onProjectUpdate={handleUpdate}
+            onCreateJourney={handleCreateJourney}
+          />
+        )}
       </div>
 
       {/* Changes Dialog */}
@@ -140,6 +272,8 @@ export function ProjectDetailPage() {
           onKeepCurrent={changesDialog.onKeepCurrent}
         />
       )}
+
+      <SpeechToText />
     </div>
   )
 }

@@ -1,9 +1,10 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useProjects } from '../../hooks/useProjects'
 import { useJourneys } from '../../hooks/useJourneys'
+import { useVSCodeLaunch } from '../../hooks/useVSCodeLaunch'
 import { JourneyCard } from './JourneyCard'
+import { JourneyIdeaInput } from './JourneyIdeaInput'
 import { Button } from '../common/Button'
-import { Input } from '../common/Input'
 import { ToastContainer, ToastData } from '../common/Toast'
 import type { Journey, JourneyStage, JourneyType } from '../../types'
 import { getStagesForType, getInitialStage } from '@dev-orchestrator/shared'
@@ -60,56 +61,43 @@ function getCompletionStats(journeys: Journey[], type: JourneyType) {
   return { completed, total: typeJourneys.length }
 }
 
-// Quick intake form component
-function QuickIntakeForm({
-  journeyType,
-  onSubmit,
-  isSubmitting,
-}: {
-  journeyType: JourneyType
-  onSubmit: (name: string, description: string) => Promise<void>
-  isSubmitting: boolean
-}) {
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
+// Group structure for parent-child journeys
+interface JourneyGroup {
+  parent: Journey | null  // null for standalone journeys
+  children: Journey[]
+}
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!name.trim()) return
-    await onSubmit(name.trim(), description.trim())
-    setName('')
-    setDescription('')
+// Group journeys by their parent_journey_id
+function groupJourneysByParent(journeys: Journey[], allJourneys: Journey[]): JourneyGroup[] {
+  const groups: JourneyGroup[] = []
+  const childrenByParent = new Map<string, Journey[]>()
+  const parentIds = new Set<string>()
+
+  // First pass: collect all parent IDs and group children
+  for (const journey of journeys) {
+    if (journey.parent_journey_id) {
+      const children = childrenByParent.get(journey.parent_journey_id) || []
+      children.push(journey)
+      childrenByParent.set(journey.parent_journey_id, children)
+      parentIds.add(journey.parent_journey_id)
+    }
   }
 
-  const placeholders: Record<JourneyType, string> = {
-    feature_planning: 'e.g., Add user authentication flow',
-    feature: 'e.g., Implement login form from Plan #123',
-    bug: 'e.g., Fix checkout button not responding',
-    investigation: 'e.g., Research caching strategies',
+  // Second pass: create groups with parent info (parent + children)
+  for (const [parentId, children] of childrenByParent) {
+    const parent = allJourneys.find(j => j.id === parentId) || null
+    groups.push({ parent, children })
   }
 
-  return (
-    <form onSubmit={handleSubmit} className="bg-gray-100 dark:bg-gray-800/50 rounded-lg p-4 mb-4 border border-gray-200 dark:border-transparent">
-      <div className="flex gap-3">
-        <div className="flex-1 space-y-2">
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={placeholders[journeyType]}
-          />
-          <Input
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Brief description (optional)"
-            className="text-sm"
-          />
-        </div>
-        <Button type="submit" disabled={isSubmitting || !name.trim()}>
-          {isSubmitting ? 'Creating...' : '+ Add'}
-        </Button>
-      </div>
-    </form>
-  )
+  // Third pass: add standalone journeys (NOT parents) as individual groups
+  // A journey is standalone if it has no parent_journey_id AND is not itself a parent
+  for (const journey of journeys) {
+    if (!journey.parent_journey_id && !parentIds.has(journey.id)) {
+      groups.push({ parent: null, children: [journey] })
+    }
+  }
+
+  return groups
 }
 
 export function JourneysTab() {
@@ -136,10 +124,11 @@ export function JourneysTab() {
   }, [selectedProject?.id])
 
   const { journeys, loading, error, createJourney, updateJourney, deleteJourney, startJourney } = useJourneys(selectedProject?.id)
+  const { launchForJourney } = useVSCodeLaunch()
   const [activeType, setActiveType] = useState<JourneyType>('feature_planning')
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
-  const [isCreating, setIsCreating] = useState(false)
   const [toasts, setToasts] = useState<ToastData[]>([])
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [gitStatus, setGitStatus] = useState<ProjectGitStatus>({ isRepo: true, checking: true })
   const [isInitializingGit, setIsInitializingGit] = useState(false)
 
@@ -200,6 +189,46 @@ export function JourneysTab() {
   const filteredJourneys = useMemo(() => {
     return journeys.filter(j => j.type === activeType)
   }, [journeys, activeType])
+
+  // Group journeys by parent (for feature type, group by parent_journey_id)
+  const groupedJourneys = useMemo(() => {
+    return groupJourneysByParent(filteredJourneys, journeys)
+  }, [filteredJourneys, journeys])
+
+  // Get available groups (journeys that can be parents - those that already have children or have "(Group)" in name)
+  const availableGroups = useMemo(() => {
+    const parentIds = new Set(journeys.filter(j => j.parent_journey_id).map(j => j.parent_journey_id!))
+    return journeys
+      .filter(j =>
+        j.type === 'feature' &&
+        j.project_id === selectedProject?.id &&
+        (parentIds.has(j.id) || j.name.includes('(Group)'))
+      )
+      .map(j => ({ id: j.id, name: j.name }))
+  }, [journeys, selectedProject?.id])
+
+  // Handle assigning a journey to a group
+  const handleAssignToGroup = useCallback(async (journeyId: string, groupId: string | null) => {
+    try {
+      await updateJourney(journeyId, { parent_journey_id: groupId })
+      showToast(groupId ? 'Moved to group' : 'Removed from group', 'success')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to update journey', 'error')
+    }
+  }, [updateJourney, showToast])
+
+  // Toggle group collapse state
+  const toggleGroupCollapse = useCallback((groupId: string) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev)
+      if (next.has(groupId)) {
+        next.delete(groupId)
+      } else {
+        next.add(groupId)
+      }
+      return next
+    })
+  }, [])
 
   // Get stats for all types
   const typeStats = useMemo(() => {
@@ -304,42 +333,36 @@ export function JourneysTab() {
   }
 
   const handleOpenInVSCode = async (journey: Journey) => {
-    if (!selectedProject || !journey.worktree_path) {
-      showToast('Journey must be started first to open in VS Code', 'info')
+    if (!selectedProject) {
+      showToast('No project selected', 'error')
       return
     }
+
     try {
-      const result = await window.electronAPI.vscode.launchForJourney({
-        journeyId: journey.id,
-        journeyName: journey.name,
-        journeyType: journey.type,
-        journeyStage: journey.stage,
-        worktreePath: journey.worktree_path,
-        projectRootPath: selectedProject.root_path,
-      })
+      const result = await launchForJourney(journey, selectedProject)
       if (!result.success) {
         showToast(result.error || 'Failed to open VS Code', 'error')
+      } else if (result.isNewSession) {
+        showToast('Started new session', 'success')
       }
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to open VS Code', 'error')
     }
   }
 
-  const handleQuickCreate = async (name: string, description: string) => {
+  const handleQuickCreate = async (parsed: { name: string; description: string; early_plan: string; type: JourneyType }) => {
     if (!selectedProject) return
-    setIsCreating(true)
     try {
       await createJourney({
         project_id: selectedProject.id,
-        name,
-        description: description || null,
-        type: activeType,
-        stage: getInitialStage(activeType),
+        name: parsed.name,
+        description: `${parsed.description}\n\n**Early Plan:**\n${parsed.early_plan}`,
+        type: parsed.type,
+        stage: getInitialStage(parsed.type),
       })
     } catch (err) {
       console.error('Failed to create journey:', err)
-    } finally {
-      setIsCreating(false)
+      throw err // Re-throw so the input card shows the error
     }
   }
 
@@ -444,34 +467,37 @@ export function JourneysTab() {
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden p-4">
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {/* Loading/Error states for journeys */}
         {loading ? (
-          <div className="flex-1 flex items-center justify-center">
+          <div className="flex-1 flex items-center justify-center p-4">
             <div className="text-gray-500 dark:text-gray-400">Loading journeys...</div>
           </div>
         ) : error ? (
-          <div className="flex-1 flex items-center justify-center">
+          <div className="flex-1 flex items-center justify-center p-4">
             <div className="text-center">
               <p className="text-red-500 dark:text-red-400 mb-2">Failed to load journeys</p>
               <p className="text-sm text-gray-500">{error.message}</p>
             </div>
           </div>
         ) : (
-          <>
-            {/* Type Description */}
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{activeConfig.description}</p>
+          <div className="flex-1 flex flex-col min-h-0 p-4">
+            {/* Type Description - shrink-0 to prevent compression */}
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 shrink-0">{activeConfig.description}</p>
 
-            {/* Quick Intake Form */}
-            <QuickIntakeForm
-              journeyType={activeType}
-              onSubmit={handleQuickCreate}
-              isSubmitting={isCreating}
-            />
+            {/* Quick Idea Input - shrink-0 to prevent compression */}
+            <div className="bg-gray-100 dark:bg-gray-800/50 rounded-lg p-4 mb-4 border border-gray-200 dark:border-transparent shrink-0">
+              <JourneyIdeaInput
+                projectName={selectedProject?.name || 'Project'}
+                onSubmit={handleQuickCreate}
+                forceType={activeType}
+                placeholder={`Describe your ${activeConfig.label.toLowerCase()} idea...`}
+              />
+            </div>
 
-            {/* Journey Cards */}
+            {/* Journey Cards - flex-1 to take remaining space, overflow for scroll */}
             {filteredJourneys.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center">
+              <div className="flex-1 flex items-center justify-center min-h-0">
                 <div className="text-center">
                   <span className="text-4xl mb-3 block">{activeConfig.icon}</span>
                   <p className="text-gray-500 dark:text-gray-400 mb-1">No {activeConfig.label.toLowerCase()} journeys yet</p>
@@ -479,23 +505,99 @@ export function JourneysTab() {
                 </div>
               </div>
             ) : (
-              <div className="flex-1 overflow-y-auto">
-                <div className="flex flex-col gap-2">
-                  {filteredJourneys.map(journey => (
-                    <JourneyCard
-                      key={journey.id}
-                      journey={journey}
-                      onUpdateStage={(stage) => handleUpdateStage(journey.id, stage)}
-                      onStart={() => handleStart(journey)}
-                      onDelete={() => setDeleteConfirm(journey.id)}
-                      onClick={() => handleOpenJourneyDetail(journey)}
-                      onOpenInVSCode={() => handleOpenInVSCode(journey)}
-                    />
-                  ))}
+              <div className="flex-1 overflow-y-auto min-h-0">
+                <div className="flex flex-col gap-3 pb-4">
+                  {groupedJourneys.map((group, groupIndex) => {
+                    const groupId = group.parent?.id || `standalone-${groupIndex}`
+                    const isCollapsed = collapsedGroups.has(groupId)
+                    const hasParent = group.parent !== null
+                    const isMultiChildGroup = hasParent && group.children.length > 0
+
+                    // For groups with a parent, render with a parent header
+                    if (isMultiChildGroup) {
+                      return (
+                        <div key={groupId} className="border border-purple-200 dark:border-purple-800/50 rounded-lg overflow-hidden bg-purple-50/30 dark:bg-purple-900/10">
+                          {/* Parent Journey Header */}
+                          <button
+                            onClick={() => toggleGroupCollapse(groupId)}
+                            className="w-full flex items-center gap-3 px-4 py-3 bg-purple-100/50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors"
+                          >
+                            {/* Expand/Collapse Arrow */}
+                            <svg
+                              className={`w-4 h-4 text-purple-600 dark:text-purple-400 transition-transform ${isCollapsed ? '' : 'rotate-90'}`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                            {/* Parent Icon */}
+                            <svg className="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                            </svg>
+                            <div className="flex-1 text-left">
+                              <span className="text-sm font-medium text-purple-700 dark:text-purple-300">
+                                {group.parent!.name}
+                              </span>
+                              <span className="ml-2 text-xs text-purple-500 dark:text-purple-400">
+                                ({group.children.length} {group.children.length === 1 ? 'journey' : 'journeys'})
+                              </span>
+                            </div>
+                            {/* View Parent Button */}
+                            <span
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (group.parent) handleOpenJourneyDetail(group.parent)
+                              }}
+                              className="text-xs text-purple-500 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-200 underline"
+                            >
+                              View parent
+                            </span>
+                          </button>
+
+                          {/* Child Journeys */}
+                          {!isCollapsed && (
+                            <div className="flex flex-col gap-2 p-2">
+                              {group.children.map(journey => (
+                                <JourneyCard
+                                  key={journey.id}
+                                  journey={journey}
+                                  parentJourneyName={group.parent?.name}
+                                  availableGroups={availableGroups}
+                                  onUpdateStage={(stage) => handleUpdateStage(journey.id, stage)}
+                                  onStart={() => handleStart(journey)}
+                                  onDelete={() => setDeleteConfirm(journey.id)}
+                                  onClick={() => handleOpenJourneyDetail(journey)}
+                                  onOpenInVSCode={() => handleOpenInVSCode(journey)}
+                                  onOpenParent={() => group.parent && handleOpenJourneyDetail(group.parent)}
+                                  onAssignToGroup={(groupId) => handleAssignToGroup(journey.id, groupId)}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    }
+
+                    // Standalone journeys (no parent) - render directly
+                    return group.children.map(journey => (
+                      <JourneyCard
+                        key={journey.id}
+                        journey={journey}
+                        availableGroups={availableGroups}
+                        onUpdateStage={(stage) => handleUpdateStage(journey.id, stage)}
+                        onStart={() => handleStart(journey)}
+                        onDelete={() => setDeleteConfirm(journey.id)}
+                        onClick={() => handleOpenJourneyDetail(journey)}
+                        onOpenInVSCode={() => handleOpenInVSCode(journey)}
+                        onAssignToGroup={(groupId) => handleAssignToGroup(journey.id, groupId)}
+                      />
+                    ))
+                  })}
                 </div>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
 

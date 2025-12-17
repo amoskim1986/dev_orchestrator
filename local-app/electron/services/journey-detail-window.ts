@@ -8,7 +8,7 @@ export interface JourneyTabData {
 
 class JourneyDetailWindowManager {
   private window: BrowserWindow | null = null
-  private openJourneys: Set<string> = new Set()
+  private openJourneys: Map<string, string> = new Map() // journeyId -> projectId
 
   async open(journeyId: string, projectId: string): Promise<void> {
     // Check if this journey is already open
@@ -25,7 +25,7 @@ class JourneyDetailWindowManager {
       // Window exists - add a new tab
       this.window.webContents.send('journeyDetail:addTab', { journeyId, projectId })
       this.window.focus()
-      this.openJourneys.add(journeyId)
+      this.openJourneys.set(journeyId, projectId)
       return
     }
 
@@ -45,6 +45,9 @@ class JourneyDetailWindowManager {
       },
     })
 
+    // Store this journey
+    this.openJourneys.set(journeyId, projectId)
+
     // Load the journey detail page
     const devServerUrl = process.env.VITE_DEV_SERVER_URL || (!app.isPackaged ? 'http://localhost:3010/' : undefined)
     if (devServerUrl) {
@@ -53,21 +56,39 @@ class JourneyDetailWindowManager {
       this.window.loadFile(path.join(__dirname, '../../dist/journey-detail.html'))
     }
 
-    // Wait for the window to be ready, then send the initial journey
-    await new Promise<void>((resolve) => {
-      this.window!.webContents.once('did-finish-load', () => {
-        this.window!.webContents.send('journeyDetail:init', { journeyId, projectId })
-        resolve()
-      })
+    // Send state when page loads (handles both initial load and refresh)
+    this.window.webContents.on('did-finish-load', () => {
+      this.sendCurrentState()
     })
-
-    this.openJourneys.add(journeyId)
 
     // Handle window close
     this.window.on('closed', () => {
       this.window = null
       this.openJourneys.clear()
     })
+  }
+
+  /**
+   * Re-send the current state to the window (used on refresh)
+   */
+  private sendCurrentState(): void {
+    if (!this.window || this.window.isDestroyed()) return
+
+    const journeys = Array.from(this.openJourneys.entries())
+    if (journeys.length === 0) return
+
+    // Send the first journey as init
+    const [firstJourneyId, firstProjectId] = journeys[0]
+    this.window.webContents.send('journeyDetail:init', {
+      journeyId: firstJourneyId,
+      projectId: firstProjectId,
+    })
+
+    // Send the rest as addTab
+    for (let i = 1; i < journeys.length; i++) {
+      const [journeyId, projectId] = journeys[i]
+      this.window.webContents.send('journeyDetail:addTab', { journeyId, projectId })
+    }
   }
 
   closeTab(journeyId: string): void {
