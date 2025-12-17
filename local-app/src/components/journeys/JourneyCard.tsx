@@ -88,8 +88,8 @@ export function JourneyCard({
 
         {/* Actions */}
         <div className="flex items-center gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
-          {/* Start button for intake/reported stages */}
-          {(journey.stage === 'intake' || journey.stage === 'reported') && !isStarted && (
+          {/* Start button for feature implementation journeys only (not planning, not child journeys) */}
+          {journey.type === 'feature' && journey.stage === 'review_and_edit_plan' && !isChildJourney && !isStarted && (
             <Button size="sm" onClick={onStart}>
               Start
             </Button>

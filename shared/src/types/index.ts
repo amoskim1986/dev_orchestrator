@@ -81,15 +81,19 @@ export interface ProposedChildJourney {
   checklist_items: string[];  // Todo items for the child journey
   status: ProposedJourneyStatus;
   generated_journey_id: string | null;
+  proposed_parent_id: string | null;  // Parent proposal ID for draft grouping (before publish)
+  is_group: boolean;  // Mark this proposal as a group/parent (can have children assigned)
   sort_order: number;
   created_at: string;
   updated_at: string;
   cancelled_at: string | null;
 }
 
-export type ProposedChildJourneyInsert = Omit<ProposedChildJourney, 'id' | 'created_at' | 'updated_at' | 'cancelled_at'> & {
+export type ProposedChildJourneyInsert = Omit<ProposedChildJourney, 'id' | 'created_at' | 'updated_at' | 'cancelled_at' | 'proposed_parent_id' | 'is_group'> & {
   id?: string;
   cancelled_at?: string | null;
+  proposed_parent_id?: string | null;
+  is_group?: boolean;
 };
 
 export type ProposedChildJourneyUpdate = Partial<Omit<ProposedChildJourney, 'id' | 'created_at'>>;

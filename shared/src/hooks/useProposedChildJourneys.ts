@@ -41,6 +41,8 @@ export function useProposedChildJourneys({
         checklist_items: proposal.checklist_items || [],
         status: proposal.status,
         generated_journey_id: proposal.generated_journey_id ?? null,
+        proposed_parent_id: proposal.proposed_parent_id ?? null,
+        is_group: proposal.is_group ?? false,
         sort_order: proposal.sort_order ?? proposals.length,
         created_at: now,
         updated_at: now,
@@ -68,6 +70,8 @@ export function useProposedChildJourneys({
           checklist_items: p.checklist_items || [],
           status: p.status,
           generated_journey_id: p.generated_journey_id ?? null,
+          proposed_parent_id: p.proposed_parent_id ?? null,
+          is_group: p.is_group ?? false,
           sort_order: startOrder + i,
           created_at: now,
           updated_at: now,
@@ -95,6 +99,8 @@ export function useProposedChildJourneys({
           checklist_items: p.checklist_items || [],
           status: p.status,
           generated_journey_id: p.generated_journey_id ?? null,
+          proposed_parent_id: p.proposed_parent_id ?? null,
+          is_group: p.is_group ?? false,
           sort_order: i,
           created_at: now,
           updated_at: now,
@@ -239,6 +245,101 @@ export function useProposedChildJourneys({
     [proposals]
   );
 
+  // Get top-level proposals (no parent)
+  const getTopLevelProposals = useCallback(
+    () => proposals.filter((p) => !p.proposed_parent_id),
+    [proposals]
+  );
+
+  // Get children of a specific proposal
+  const getChildProposals = useCallback(
+    (parentId: string) => proposals.filter((p) => p.proposed_parent_id === parentId),
+    [proposals]
+  );
+
+  // Get proposals that can be parents (only those marked as groups, excluding self and descendants)
+  const getAvailableParents = useCallback(
+    (excludeId?: string) => {
+      const excludeIds = new Set<string>();
+      if (excludeId) {
+        excludeIds.add(excludeId);
+        // Also exclude any children of the excluded proposal to prevent circular references
+        const addChildren = (id: string) => {
+          proposals.filter(p => p.proposed_parent_id === id).forEach(child => {
+            excludeIds.add(child.id);
+            addChildren(child.id);
+          });
+        };
+        addChildren(excludeId);
+      }
+      // Only return proposals that are marked as groups and are drafts
+      return proposals.filter(
+        (p) => p.status === 'draft' && p.is_group && !excludeIds.has(p.id)
+      );
+    },
+    [proposals]
+  );
+
+  // Set a proposal's parent
+  const setProposalParent = useCallback(
+    async (id: string, parentId: string | null): Promise<ProposedChildJourney | null> => {
+      return updateProposal(id, { proposed_parent_id: parentId });
+    },
+    [updateProposal]
+  );
+
+  // Toggle group status
+  const toggleGroup = useCallback(
+    async (id: string): Promise<ProposedChildJourney | null> => {
+      const proposal = proposals.find((p) => p.id === id);
+      if (!proposal) return null;
+      return updateProposal(id, { is_group: !proposal.is_group });
+    },
+    [proposals, updateProposal]
+  );
+
+  // Ungroup all children from a parent (set their parent to null)
+  const ungroupChildren = useCallback(
+    async (parentId: string): Promise<void> => {
+      const children = proposals.filter((p) => p.proposed_parent_id === parentId);
+      if (children.length === 0) return;
+
+      await batchUpdateProposals(
+        children.map((child) => ({
+          id: child.id,
+          updates: { proposed_parent_id: null },
+        }))
+      );
+    },
+    [proposals, batchUpdateProposals]
+  );
+
+  // Reset a cancelled proposal back to draft
+  const uncancelProposal = useCallback(
+    async (id: string): Promise<ProposedChildJourney | null> => {
+      const proposal = proposals.find((p) => p.id === id);
+      if (!proposal || proposal.status !== 'cancelled') return null;
+      return updateProposal(id, {
+        status: 'draft',
+        cancelled_at: null,
+      });
+    },
+    [proposals, updateProposal]
+  );
+
+  // Reset a generated (published) proposal back to draft
+  const unpublishProposal = useCallback(
+    async (id: string): Promise<ProposedChildJourney | null> => {
+      const proposal = proposals.find((p) => p.id === id);
+      if (!proposal || proposal.status !== 'generated') return null;
+      return updateProposal(id, {
+        status: 'draft',
+        generated_journey_id: null,
+      });
+    },
+    [proposals, updateProposal]
+  );
+
   return {
     proposals,
     draftCount,
@@ -253,5 +354,15 @@ export function useProposedChildJourneys({
     cleanupOrphanedReferences,
     getProposalsByStatus,
     reorderProposals,
+    // Parent-child helpers
+    getTopLevelProposals,
+    getChildProposals,
+    getAvailableParents,
+    setProposalParent,
+    toggleGroup,
+    ungroupChildren,
+    // Reset actions
+    uncancelProposal,
+    unpublishProposal,
   };
 }

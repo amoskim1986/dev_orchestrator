@@ -39,7 +39,9 @@ export default defineConfig({
           index: resolve(__dirname, 'index.html'),
           terminal: resolve(__dirname, 'terminal.html'),
           'project-detail': resolve(__dirname, 'project-detail.html'),
-          'journey-detail': resolve(__dirname, 'journey-detail.html')
+          'journey-detail': resolve(__dirname, 'journey-detail.html'),
+          'journey-overlay': resolve(__dirname, 'journey-overlay.html'),
+          'markdown-viewer': resolve(__dirname, 'markdown-viewer.html')
         }
       }
     },

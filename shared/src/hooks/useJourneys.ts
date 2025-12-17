@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { getSupabase } from '../lib/supabase';
 import type { Journey, JourneyInsert, JourneyUpdate, JourneyStage, JourneyType } from '../types';
 import { getInitialStage } from '../types';
@@ -7,9 +7,14 @@ export function useJourneys(projectId?: string) {
   const [journeys, setJourneys] = useState<Journey[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const hasInitialLoad = useRef(false);
 
-  const fetchJourneys = useCallback(async () => {
-    setLoading(true);
+  const fetchJourneys = useCallback(async (showLoading = false) => {
+    // Only show loading state on initial load or if explicitly requested
+    // This prevents "Loading..." flash when switching between journey tabs
+    if (showLoading || !hasInitialLoad.current) {
+      setLoading(true);
+    }
     setError(null);
 
     let query = getSupabase()
@@ -28,6 +33,7 @@ export function useJourneys(projectId?: string) {
       setError(fetchError);
     } else {
       setJourneys(data || []);
+      hasInitialLoad.current = true;
     }
     setLoading(false);
   }, [projectId]);

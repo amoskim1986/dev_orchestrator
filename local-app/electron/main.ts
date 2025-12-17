@@ -8,6 +8,8 @@ import { registerGitIpc } from './ipc/git.ipc'
 import { registerProjectDetailIpc } from './ipc/project-detail.ipc'
 import { registerJourneyDetailIpc } from './ipc/journey-detail.ipc'
 import { registerTranscriptionsIpc } from './ipc/transcriptions.ipc'
+import { registerOverlayIpc } from './ipc/overlay.ipc'
+import { registerMarkdownViewerIpc } from './ipc/markdown-viewer.ipc'
 
 // Handle uncaught exceptions gracefully (e.g., EPIPE from child processes)
 process.on('uncaughtException', (error) => {
@@ -175,6 +177,8 @@ app.whenReady().then(async () => {
   registerProjectDetailIpc()
   registerJourneyDetailIpc()
   registerTranscriptionsIpc()
+  registerOverlayIpc()
+  registerMarkdownViewerIpc()
 
   // Dynamically import terminal IPC to avoid app.isPackaged at module load time
   const { registerTerminalIpc } = await import('./ipc/terminal.ipc')
@@ -200,7 +204,9 @@ app.on('before-quit', async () => {
   const { terminalWindowManager } = await import('./services/terminal-window')
   const { projectDetailWindowManager } = await import('./services/project-detail-window')
   const { journeyDetailWindowManager } = await import('./services/journey-detail-window')
+  const { markdownViewerWindowManager } = await import('./services/markdown-viewer-window')
   terminalWindowManager.closeAll()
   projectDetailWindowManager.closeAll()
   journeyDetailWindowManager.closeAll()
+  markdownViewerWindowManager.closeAll()
 })

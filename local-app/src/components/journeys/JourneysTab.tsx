@@ -7,7 +7,7 @@ import { JourneyIdeaInput } from './JourneyIdeaInput'
 import { Button } from '../common/Button'
 import { ToastContainer, ToastData } from '../common/Toast'
 import type { Journey, JourneyStage, JourneyType } from '../../types'
-import { getStagesForType, getInitialStage } from '@dev-orchestrator/shared'
+import { getStagesForType, getInitialStage, getSupabase } from '@dev-orchestrator/shared'
 
 const STORAGE_KEY_LAST_PROJECT = 'dev-orchestrator:last-project-id'
 
@@ -52,13 +52,39 @@ function generateBranchName(journeyName: string): string {
     .substring(0, 50)
 }
 
-// Get completion status for a journey type
-function getCompletionStats(journeys: Journey[], type: JourneyType) {
+// Status filter categories
+type StatusFilter = 'active' | 'pending' | 'done'
+
+const statusFilterConfig: Record<StatusFilter, { label: string; color: string }> = {
+  active: { label: 'Active', color: 'green' },
+  pending: { label: 'Pending', color: 'yellow' },
+  done: { label: 'Done', color: 'blue' },
+}
+
+const statusFilterOrder: StatusFilter[] = ['active', 'pending', 'done']
+
+// Get journey status category based on its type and stage
+function getJourneyStatusCategory(journey: Journey): StatusFilter {
+  const stages = getStagesForType(journey.type)
+  const firstStage = stages[0]
+  const lastStage = stages[stages.length - 1]
+
+  if (journey.stage === firstStage) return 'pending'
+  if (journey.stage === lastStage) return 'done'
+  return 'active'
+}
+
+// Get counts by status category for a journey type
+function getStatusCounts(journeys: Journey[], type: JourneyType) {
   const typeJourneys = journeys.filter(j => j.type === type)
-  const stages = getStagesForType(type)
-  const finalStage = stages[stages.length - 1]
-  const completed = typeJourneys.filter(j => j.stage === finalStage).length
-  return { completed, total: typeJourneys.length }
+  const counts = { pending: 0, active: 0, done: 0, total: typeJourneys.length }
+
+  for (const journey of typeJourneys) {
+    const category = getJourneyStatusCategory(journey)
+    counts[category]++
+  }
+
+  return counts
 }
 
 // Group structure for parent-child journeys
@@ -126,11 +152,38 @@ export function JourneysTab() {
   const { journeys, loading, error, createJourney, updateJourney, deleteJourney, startJourney } = useJourneys(selectedProject?.id)
   const { launchForJourney } = useVSCodeLaunch()
   const [activeType, setActiveType] = useState<JourneyType>('feature_planning')
+  const [activeStatusFilter, setActiveStatusFilter] = useState<StatusFilter>('active')
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [toasts, setToasts] = useState<ToastData[]>([])
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [gitStatus, setGitStatus] = useState<ProjectGitStatus>({ isRepo: true, checking: true })
   const [isInitializingGit, setIsInitializingGit] = useState(false)
+  const [spawnedFromMap, setSpawnedFromMap] = useState<Map<string, string>>(new Map())
+
+  // Fetch spawned_from links for all journeys to find linked planning journeys
+  useEffect(() => {
+    if (journeys.length === 0) {
+      setSpawnedFromMap(new Map())
+      return
+    }
+
+    const journeyIds = journeys.map(j => j.id)
+
+    getSupabase()
+      .from('journey_links')
+      .select('from_journey_id, to_journey_id')
+      .eq('relationship', 'spawned_from')
+      .in('from_journey_id', journeyIds)
+      .then(({ data }) => {
+        if (data) {
+          const map = new Map<string, string>()
+          for (const link of data) {
+            map.set(link.from_journey_id, link.to_journey_id)
+          }
+          setSpawnedFromMap(map)
+        }
+      })
+  }, [journeys])
 
   // Check git status when project changes
   useEffect(() => {
@@ -185,10 +238,12 @@ export function JourneysTab() {
     }
   }, [selectedProject?.root_path, showToast])
 
-  // Filter journeys by active type
+  // Filter journeys by active type and status filter
   const filteredJourneys = useMemo(() => {
-    return journeys.filter(j => j.type === activeType)
-  }, [journeys, activeType])
+    return journeys.filter(j =>
+      j.type === activeType && getJourneyStatusCategory(j) === activeStatusFilter
+    )
+  }, [journeys, activeType, activeStatusFilter])
 
   // Group journeys by parent (for feature type, group by parent_journey_id)
   const groupedJourneys = useMemo(() => {
@@ -230,13 +285,10 @@ export function JourneysTab() {
     })
   }, [])
 
-  // Get stats for all types
-  const typeStats = useMemo(() => {
-    return journeyTypeOrder.reduce((acc, type) => {
-      acc[type] = getCompletionStats(journeys, type)
-      return acc
-    }, {} as Record<JourneyType, { completed: number; total: number }>)
-  }, [journeys])
+  // Get status counts for current type
+  const statusCounts = useMemo(() => {
+    return getStatusCounts(journeys, activeType)
+  }, [journeys, activeType])
 
   const handleUpdateStage = async (id: string, stage: JourneyStage) => {
     try {
@@ -393,7 +445,7 @@ export function JourneysTab() {
   const activeConfig = journeyTypeConfig[activeType]
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       {/* Project Tabs */}
       <div className="flex items-center border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
         <div className="px-4 py-2 text-sm font-medium text-gray-500">Project:</div>
@@ -439,7 +491,8 @@ export function JourneysTab() {
       <div className="flex border-b border-gray-200 dark:border-gray-700">
         {journeyTypeOrder.map((type) => {
           const config = journeyTypeConfig[type]
-          const stats = typeStats[type]
+          const typeCounts = getStatusCounts(journeys, type)
+          const inProgress = typeCounts.active + typeCounts.pending
           const isActive = activeType === type
 
           return (
@@ -454,13 +507,58 @@ export function JourneysTab() {
             >
               <span>{config.icon}</span>
               <span className="text-sm font-medium">{config.label}</span>
-              {stats.total > 0 && (
+              {typeCounts.total > 0 && (
                 <span className={`text-xs px-1.5 py-0.5 rounded ${
                   isActive ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-300' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
                 }`}>
-                  {stats.completed}/{stats.total}
+                  {inProgress}/{typeCounts.total}
                 </span>
               )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Status Filter Tabs */}
+      <div className="flex gap-2 px-4 py-2 bg-gray-50 dark:bg-gray-900/30 border-b border-gray-200 dark:border-gray-700">
+        {statusFilterOrder.map((status) => {
+          const config = statusFilterConfig[status]
+          const count = statusCounts[status]
+          const isActive = activeStatusFilter === status
+          const isEmpty = count === 0
+
+          const colorClasses = {
+            active: {
+              selected: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700',
+              default: 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700',
+              empty: 'bg-gray-50 dark:bg-gray-900 text-gray-400 dark:text-gray-600 border-gray-200 dark:border-gray-800',
+            },
+            pending: {
+              selected: 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700',
+              default: 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700',
+              empty: 'bg-gray-50 dark:bg-gray-900 text-gray-400 dark:text-gray-600 border-gray-200 dark:border-gray-800',
+            },
+            done: {
+              selected: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700',
+              default: 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700',
+              empty: 'bg-gray-50 dark:bg-gray-900 text-gray-400 dark:text-gray-600 border-gray-200 dark:border-gray-800',
+            },
+          }
+
+          const buttonClass = isEmpty && !isActive
+            ? colorClasses[status].empty
+            : colorClasses[status][isActive ? 'selected' : 'default']
+
+          return (
+            <button
+              key={status}
+              onClick={() => setActiveStatusFilter(status)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${buttonClass}`}
+            >
+              <span>{config.label}</span>
+              <span className={`text-xs ${isEmpty ? 'opacity-50' : 'opacity-75'}`}>
+                {count}
+              </span>
             </button>
           )
         })}
@@ -481,7 +579,7 @@ export function JourneysTab() {
             </div>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col min-h-0 p-4">
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-4">
             {/* Type Description - shrink-0 to prevent compression */}
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 shrink-0">{activeConfig.description}</p>
 
@@ -500,13 +598,22 @@ export function JourneysTab() {
               <div className="flex-1 flex items-center justify-center min-h-0">
                 <div className="text-center">
                   <span className="text-4xl mb-3 block">{activeConfig.icon}</span>
-                  <p className="text-gray-500 dark:text-gray-400 mb-1">No {activeConfig.label.toLowerCase()} journeys yet</p>
-                  <p className="text-sm text-gray-500">Use the form above to create one</p>
+                  <p className="text-gray-500 dark:text-gray-400 mb-1">
+                    No {statusFilterConfig[activeStatusFilter].label.toLowerCase()} {activeConfig.label.toLowerCase()} journeys
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    {activeStatusFilter === 'pending'
+                      ? 'Use the form above to create one'
+                      : `Switch to another status filter or create a new journey`}
+                  </p>
                 </div>
               </div>
             ) : (
-              <div className="flex-1 overflow-y-auto min-h-0">
-                <div className="flex flex-col gap-3 pb-4">
+              <div
+                className="flex-1 overflow-y-auto min-h-0"
+                style={{ maxHeight: 'calc(100vh - 420px)' }}
+              >
+                <div className="space-y-3 pb-4">
                   {groupedJourneys.map((group, groupIndex) => {
                     const groupId = group.parent?.id || `standalone-${groupIndex}`
                     const isCollapsed = collapsedGroups.has(groupId)
@@ -515,49 +622,113 @@ export function JourneysTab() {
 
                     // For groups with a parent, render with a parent header
                     if (isMultiChildGroup) {
+                      const parent = group.parent!
+                      const planningJourneyId = spawnedFromMap.get(parent.id)
+                      const planningJourney = planningJourneyId ? journeys.find(j => j.id === planningJourneyId) : null
+                      const isParentStarted = !!parent.branch_name
+
                       return (
-                        <div key={groupId} className="border border-purple-200 dark:border-purple-800/50 rounded-lg overflow-hidden bg-purple-50/30 dark:bg-purple-900/10">
+                        <div key={groupId} className="border border-purple-200 dark:border-purple-800/50 rounded-lg bg-purple-50/30 dark:bg-purple-900/10">
                           {/* Parent Journey Header */}
-                          <button
+                          <div
+                            role="button"
+                            tabIndex={0}
                             onClick={() => toggleGroupCollapse(groupId)}
-                            className="w-full flex items-center gap-3 px-4 py-3 bg-purple-100/50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors"
+                            onKeyDown={(e) => e.key === 'Enter' && toggleGroupCollapse(groupId)}
+                            className="w-full px-4 py-3 bg-purple-100/50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors cursor-pointer"
                           >
-                            {/* Expand/Collapse Arrow */}
-                            <svg
-                              className={`w-4 h-4 text-purple-600 dark:text-purple-400 transition-transform ${isCollapsed ? '' : 'rotate-90'}`}
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                            {/* Parent Icon */}
-                            <svg className="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                            </svg>
-                            <div className="flex-1 text-left">
-                              <span className="text-sm font-medium text-purple-700 dark:text-purple-300">
-                                {group.parent!.name}
-                              </span>
-                              <span className="ml-2 text-xs text-purple-500 dark:text-purple-400">
-                                ({group.children.length} {group.children.length === 1 ? 'journey' : 'journeys'})
+                            {/* Top row: collapse arrow, icon, name, count, view button */}
+                            <div className="flex items-center gap-3">
+                              {/* Expand/Collapse Arrow */}
+                              <svg
+                                className={`w-4 h-4 text-purple-600 dark:text-purple-400 transition-transform ${isCollapsed ? '' : 'rotate-90'}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                              {/* Parent Icon */}
+                              <svg className="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                              </svg>
+                              <div className="flex-1 text-left">
+                                <span className="text-sm font-medium text-purple-700 dark:text-purple-300">
+                                  {parent.name}
+                                </span>
+                                <span className="ml-2 text-xs text-purple-500 dark:text-purple-400">
+                                  ({group.children.length} {group.children.length === 1 ? 'journey' : 'journeys'})
+                                </span>
+                              </div>
+                              {/* View Parent Button */}
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleOpenJourneyDetail(parent)
+                                }}
+                                className="text-xs text-purple-500 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-200 underline"
+                              >
+                                View group
                               </span>
                             </div>
-                            {/* View Parent Button */}
-                            <span
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                if (group.parent) handleOpenJourneyDetail(group.parent)
-                              }}
-                              className="text-xs text-purple-500 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-200 underline"
-                            >
-                              View parent
-                            </span>
-                          </button>
+
+                            {/* Second row: stage, branch, links */}
+                            <div className="flex items-center gap-3 mt-2 ml-7 text-xs">
+                              {/* Stage badge */}
+                              <span className="px-2 py-0.5 rounded bg-purple-200/70 dark:bg-purple-800/50 text-purple-700 dark:text-purple-300">
+                                {parent.stage.replace(/_/g, ' ')}
+                              </span>
+
+                              {/* Branch name */}
+                              {isParentStarted && parent.branch_name && (
+                                <span className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
+                                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
+                                    <path fillRule="evenodd" d="M11.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122V6A2.5 2.5 0 0110 8.5H6a1 1 0 00-1 1v1.128a2.251 2.251 0 11-1.5 0V5.372a2.25 2.25 0 111.5 0v1.836A2.492 2.492 0 016 7h4a1 1 0 001-1v-.628A2.25 2.25 0 019.5 3.25zM4.25 12a.75.75 0 100 1.5.75.75 0 000-1.5zM3.5 3.25a.75.75 0 111.5 0 .75.75 0 01-1.5 0z"/>
+                                  </svg>
+                                  <span className="font-mono truncate max-w-[150px]">{parent.branch_name}</span>
+                                </span>
+                              )}
+
+                              {/* Divider */}
+                              {(planningJourney || parent.source_url) && (
+                                <span className="text-gray-300 dark:text-gray-600">|</span>
+                              )}
+
+                              {/* Planning journey link */}
+                              {planningJourney && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleOpenJourneyDetail(planningJourney)
+                                  }}
+                                  className="flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline"
+                                >
+                                  <span>📋</span>
+                                  <span>View Plan</span>
+                                </button>
+                              )}
+
+                              {/* Source URL */}
+                              {parent.source_url && (
+                                <a
+                                  href={parent.source_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline"
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                  </svg>
+                                  <span>Source</span>
+                                </a>
+                              )}
+                            </div>
+                          </div>
 
                           {/* Child Journeys */}
                           {!isCollapsed && (
-                            <div className="flex flex-col gap-2 p-2">
+                            <div className="space-y-2 p-2">
                               {group.children.map(journey => (
                                 <JourneyCard
                                   key={journey.id}

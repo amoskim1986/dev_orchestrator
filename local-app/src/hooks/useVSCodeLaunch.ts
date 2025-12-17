@@ -82,9 +82,47 @@ export function useVSCodeLaunch() {
   }, []);
 
   /**
-   * Launch VS Code for a journey with session tracking
+   * Open VS Code at a journey's directory (without starting Claude Code chat)
    */
-  const launchForJourney = useCallback(async (
+  const openVSCode = useCallback(async (
+    journey: Journey,
+    project: Project
+  ): Promise<VSCodeLaunchResult> => {
+    setIsLaunching(true);
+
+    try {
+      // Determine working directory
+      const workingPath = journey.worktree_path || project.root_path;
+
+      // Just open VS Code without Claude Code
+      const result = await window.electronAPI.vscode.launch({
+        workingDirectory: workingPath,
+        maximizeChat: false,
+        newWindow: true,
+      });
+
+      if (!result.success) {
+        return {
+          success: false,
+          error: result.error || 'Failed to open VS Code',
+        };
+      }
+
+      return { success: true };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Failed to open VS Code',
+      };
+    } finally {
+      setIsLaunching(false);
+    }
+  }, []);
+
+  /**
+   * Launch VS Code with a new Claude Code chat for a journey (with session tracking)
+   */
+  const launchClaudeCode = useCallback(async (
     journey: Journey,
     project: Project
   ): Promise<VSCodeLaunchResult> => {
@@ -109,7 +147,7 @@ export function useVSCodeLaunch() {
 
       setLastSession(session);
 
-      // Launch VS Code
+      // Launch VS Code with Claude Code
       const result = await window.electronAPI.vscode.launchForJourney({
         journeyId: journey.id,
         journeyName: journey.name,
@@ -122,11 +160,22 @@ export function useVSCodeLaunch() {
       if (!result.success) {
         return {
           success: false,
-          error: result.error || 'Failed to launch VS Code',
+          error: result.error || 'Failed to launch Claude Code',
           session,
           isNewSession,
         };
       }
+
+      // Show the journey overlay and register it for VS Code focus tracking
+      await window.electronAPI.overlay?.show({
+        journeyId: journey.id,
+        projectId: project.id,
+        journeyName: journey.name,
+        journeyType: journey.type,
+        journeyStage: journey.stage,
+        branchName: journey.branch_name || undefined,
+        workspacePath: workingPath,
+      });
 
       return {
         success: true,
@@ -136,7 +185,7 @@ export function useVSCodeLaunch() {
     } catch (err) {
       return {
         success: false,
-        error: err instanceof Error ? err.message : 'Failed to launch VS Code',
+        error: err instanceof Error ? err.message : 'Failed to launch Claude Code',
       };
     } finally {
       setIsLaunching(false);
@@ -167,7 +216,10 @@ export function useVSCodeLaunch() {
   }, []);
 
   return {
-    launchForJourney,
+    openVSCode,
+    launchClaudeCode,
+    // Alias for backward compatibility
+    launchForJourney: launchClaudeCode,
     isLaunching,
     lastSession,
     getActiveSessionForJourney,

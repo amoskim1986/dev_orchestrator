@@ -421,7 +421,59 @@ contextBridge.exposeInMainWorld('electronAPI', {
     recoverCrashed: () =>
       ipcRenderer.invoke('transcriptions:recoverCrashed') as Promise<string[]>,
   },
+
+  // Journey Overlay API - Floating overlay for active journeys
+  overlay: {
+    onInit: (callback: (data: JourneyOverlayData) => void) => {
+      ipcRenderer.on('overlay:init', (_event, data) => callback(data))
+    },
+    onUpdate: (callback: (data: JourneyOverlayData) => void) => {
+      ipcRenderer.on('overlay:update', (_event, data) => callback(data))
+    },
+    show: (data: JourneyOverlayData) =>
+      ipcRenderer.invoke('overlay:show', data) as Promise<{ success: boolean }>,
+    hide: () =>
+      ipcRenderer.invoke('overlay:hide') as Promise<{ success: boolean }>,
+    close: () =>
+      ipcRenderer.invoke('overlay:close') as Promise<{ success: boolean }>,
+    openJourneyDetail: (journeyId: string, projectId: string) =>
+      ipcRenderer.invoke('overlay:openJourneyDetail', journeyId, projectId) as Promise<{ success: boolean }>,
+  },
+
+  // Markdown Viewer API - Opens markdown content in a new window
+  markdownViewer: {
+    onInit: (callback: (data: MarkdownViewerData) => void) => {
+      ipcRenderer.on('markdownViewer:init', (_event, data) => callback(data))
+    },
+    onUpdate: (callback: (data: MarkdownViewerData) => void) => {
+      ipcRenderer.on('markdownViewer:update', (_event, data) => callback(data))
+    },
+    open: (key: string, data: MarkdownViewerData) =>
+      ipcRenderer.invoke('markdownViewer:open', key, data) as Promise<void>,
+    update: (key: string, data: MarkdownViewerData) =>
+      ipcRenderer.invoke('markdownViewer:update', key, data) as Promise<void>,
+    close: (key: string) =>
+      ipcRenderer.invoke('markdownViewer:close', key) as Promise<void>,
+  },
 })
+
+// Journey overlay data type
+interface JourneyOverlayData {
+  journeyId: string
+  projectId: string
+  journeyName: string
+  journeyType: string
+  journeyStage: string
+  branchName?: string
+  workspacePath?: string
+}
+
+// Markdown viewer data type
+interface MarkdownViewerData {
+  title: string
+  content: string
+  journeyId?: string
+}
 
 // Type definitions for the exposed API
 declare global {
@@ -506,6 +558,21 @@ declare global {
         update: (id: string, updates: TranscriptionSessionUpdate) => Promise<TranscriptionSession | null>
         delete: (id: string) => Promise<boolean>
         recoverCrashed: () => Promise<string[]>
+      }
+      overlay: {
+        onInit: (callback: (data: JourneyOverlayData) => void) => void
+        onUpdate: (callback: (data: JourneyOverlayData) => void) => void
+        show: (data: JourneyOverlayData) => Promise<{ success: boolean }>
+        hide: () => Promise<{ success: boolean }>
+        close: () => Promise<{ success: boolean }>
+        openJourneyDetail: (journeyId: string, projectId: string) => Promise<{ success: boolean }>
+      }
+      markdownViewer: {
+        onInit: (callback: (data: MarkdownViewerData) => void) => void
+        onUpdate: (callback: (data: MarkdownViewerData) => void) => void
+        open: (key: string, data: MarkdownViewerData) => Promise<void>
+        update: (key: string, data: MarkdownViewerData) => Promise<void>
+        close: (key: string) => Promise<void>
       }
     }
   }

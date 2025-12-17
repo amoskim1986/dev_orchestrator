@@ -8,6 +8,7 @@ import { Input } from '../../common/Input'
 interface OverviewTabProps {
   journey: Journey
   onUpdate: (updates: JourneyUpdate) => Promise<void>
+  onDelete?: () => void
 }
 
 // Stage descriptions for each type
@@ -36,7 +37,7 @@ const stageDescriptions: Record<JourneyStage, string> = {
   fixing: 'Implementing the fix',
 }
 
-export function OverviewTab({ journey, onUpdate }: OverviewTabProps) {
+export function OverviewTab({ journey, onUpdate, onDelete }: OverviewTabProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState(journey.name)
   const [editDescription, setEditDescription] = useState(journey.description || '')
@@ -217,6 +218,19 @@ export function OverviewTab({ journey, onUpdate }: OverviewTabProps) {
           </Button>
         )}
       </div>
+
+      {/* Danger Zone */}
+      {onDelete && (
+        <div className="pt-6 mt-6 border-t border-red-200 dark:border-red-900/30">
+          <h3 className="text-sm font-medium text-red-600 dark:text-red-400 mb-3">Danger Zone</h3>
+          <Button variant="danger" onClick={onDelete}>
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Delete Journey
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

@@ -19,6 +19,7 @@ import { SpeechToText } from '../../components/SpeechToText'
 interface JourneyTabData {
   journeyId: string
   projectId: string
+  journeyName?: string  // Cached name so tab doesn't show "Loading..." when switching projects
 }
 
 interface JourneyDetailState {
@@ -52,9 +53,9 @@ export function JourneyDetailPage() {
 
   // Get the active tab's projectId for the useJourneys hook
   const activeTab = tabs.find(t => t.journeyId === activeTabId)
-  const { journeys, updateJourney, loading } = useJourneys(activeTab?.projectId)
+  const { journeys, updateJourney, deleteJourney, loading } = useJourneys(activeTab?.projectId)
   const { projects } = useProjects()
-  const { launchForJourney } = useVSCodeLaunch()
+  const { openVSCode, launchClaudeCode } = useVSCodeLaunch()
 
   // Get the active journey from the journeys list
   const activeJourney = journeys.find(j => j.id === activeTabId) || null
@@ -145,7 +146,7 @@ export function JourneyDetailPage() {
     showToast(`Stage advanced to: ${newStage.replace(/_/g, ' ')}`, 'success')
   }, [activeJourney, updateJourney, showToast])
 
-  // Handle opening in VS Code
+  // Handle opening in VS Code (just opens the folder)
   const handleOpenInVSCode = useCallback(async () => {
     if (!activeJourney || !activeProject) {
       showToast('Journey or project not found', 'error')
@@ -153,16 +154,50 @@ export function JourneyDetailPage() {
     }
 
     try {
-      const result = await launchForJourney(activeJourney, activeProject)
+      const result = await openVSCode(activeJourney, activeProject)
       if (!result.success) {
         showToast(result.error || 'Failed to open VS Code', 'error')
-      } else if (result.isNewSession) {
-        showToast('Started new session', 'success')
       }
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to open VS Code', 'error')
     }
-  }, [activeJourney, activeProject, launchForJourney, showToast])
+  }, [activeJourney, activeProject, openVSCode, showToast])
+
+  // Handle launching Claude Code in VS Code (starts new chat)
+  const handleLaunchClaudeCode = useCallback(async () => {
+    if (!activeJourney || !activeProject) {
+      showToast('Journey or project not found', 'error')
+      return
+    }
+
+    try {
+      const result = await launchClaudeCode(activeJourney, activeProject)
+      if (!result.success) {
+        showToast(result.error || 'Failed to launch Claude Code', 'error')
+      } else if (result.isNewSession) {
+        showToast('Started new session', 'success')
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to launch Claude Code', 'error')
+    }
+  }, [activeJourney, activeProject, launchClaudeCode, showToast])
+
+  // Handle delete journey
+  const handleDelete = useCallback(async () => {
+    if (!activeJourney) return
+
+    const confirmed = window.confirm(`Are you sure you want to delete "${activeJourney.name}"? This cannot be undone.`)
+    if (!confirmed) return
+
+    try {
+      await deleteJourney(activeJourney.id)
+      showToast('Journey deleted', 'success')
+      // Close this tab
+      handleCloseTab(activeJourney.id)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to delete journey', 'error')
+    }
+  }, [activeJourney, deleteJourney, showToast, handleCloseTab])
 
   // Render content tabs
   const renderTabContent = () => {
@@ -170,7 +205,7 @@ export function JourneyDetailPage() {
 
     switch (activeContentTab) {
       case 'overview':
-        return <OverviewTab journey={activeJourney} onUpdate={handleUpdate} />
+        return <OverviewTab journey={activeJourney} onUpdate={handleUpdate} onDelete={handleDelete} />
       case 'intake':
         return <IntakeTab journey={activeJourney} onStageChange={handleStageChange} />
       case 'spec':
@@ -186,10 +221,26 @@ export function JourneyDetailPage() {
     }
   }
 
-  // Get journey name for tab display
-  const getJourneyName = (journeyId: string) => {
-    const journey = journeys.find(j => j.id === journeyId)
-    return journey?.name || 'Loading...'
+  // Update tab names when journeys load (cache names for cross-project tab display)
+  useEffect(() => {
+    if (journeys.length === 0) return
+    setTabs(prev => prev.map(tab => {
+      const journey = journeys.find(j => j.id === tab.journeyId)
+      if (journey && journey.name !== tab.journeyName) {
+        return { ...tab, journeyName: journey.name }
+      }
+      return tab
+    }))
+  }, [journeys])
+
+  // Get journey name for tab display - prefer cached name
+  const getJourneyName = (tab: JourneyTabData) => {
+    // First try to get from current journeys (most up-to-date)
+    const journey = journeys.find(j => j.id === tab.journeyId)
+    if (journey) return journey.name
+    // Fall back to cached name (for tabs from different projects)
+    if (tab.journeyName) return tab.journeyName
+    return 'Loading...'
   }
 
   // Show waiting state until IPC sends journey data
@@ -226,7 +277,7 @@ export function JourneyDetailPage() {
             onClick={() => setActiveTabId(tab.journeyId)}
           >
             <span className="text-sm truncate max-w-[200px]">
-              {getJourneyName(tab.journeyId)}
+              {getJourneyName(tab)}
             </span>
             <button
               onClick={(e) => {
@@ -270,6 +321,21 @@ export function JourneyDetailPage() {
                 </div>
               )}
             </div>
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="secondary" size="sm" onClick={handleOpenInVSCode} title="Open in VS Code">
+                <svg className="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M17.5 0h-11L0 6v12l6.5 6h11L24 18V6L17.5 0zm-7.17 17.89L4.5 12l5.83-5.89 1.34 1.32L7.17 12l4.5 4.57-1.34 1.32zm3.34 0l-1.34-1.32L16.83 12l-4.5-4.57 1.34-1.32L19.5 12l-5.83 5.89z"/>
+                </svg>
+                Just VSCode
+              </Button>
+              <Button variant="primary" size="sm" onClick={handleLaunchClaudeCode} title="New Claude Code chat">
+                <svg className="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M17.5 0h-11L0 6v12l6.5 6h11L24 18V6L17.5 0zm-7.17 17.89L4.5 12l5.83-5.89 1.34 1.32L7.17 12l4.5 4.57-1.34 1.32zm3.34 0l-1.34-1.32L16.83 12l-4.5-4.57 1.34-1.32L19.5 12l-5.83 5.89z"/>
+                </svg>
+                Claude Code
+              </Button>
+            </div>
           </div>
 
           {/* Content Tab Navigation */}
@@ -278,24 +344,6 @@ export function JourneyDetailPage() {
           {/* Tab Content */}
           <div className="flex-1 overflow-y-auto p-4">
             {renderTabContent()}
-          </div>
-
-          {/* Actions Footer */}
-          <div className="border-t border-gray-200 dark:border-gray-700 p-4 shrink-0">
-            <div className="flex gap-2">
-              <Button variant="secondary" className="flex-1" onClick={handleOpenInVSCode}>
-                <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M17.5 0h-11L0 6v12l6.5 6h11L24 18V6L17.5 0zm-7.17 17.89L4.5 12l5.83-5.89 1.34 1.32L7.17 12l4.5 4.57-1.34 1.32zm3.34 0l-1.34-1.32L16.83 12l-4.5-4.57 1.34-1.32L19.5 12l-5.83 5.89z"/>
-                </svg>
-                Open in VS Code
-              </Button>
-              <Button variant="danger">
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                Delete
-              </Button>
-            </div>
           </div>
         </>
       )}
