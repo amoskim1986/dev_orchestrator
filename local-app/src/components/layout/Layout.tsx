@@ -18,9 +18,9 @@ export function Layout({ children }: LayoutProps) {
   return (
     <div className="h-screen bg-slate-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 flex flex-col overflow-hidden">
       <TitleBar />
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex min-h-0 overflow-hidden">
         <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
-        <main className="flex-1 overflow-hidden">
+        <main className="flex-1 min-h-0 overflow-hidden">
           {children(activeTab)}
         </main>
       </div>
