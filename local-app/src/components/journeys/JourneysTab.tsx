@@ -150,7 +150,7 @@ export function JourneysTab() {
   }, [selectedProject?.id])
 
   const { journeys, loading, error, createJourney, updateJourney, deleteJourney, startJourney } = useJourneys(selectedProject?.id)
-  const { launchForJourney } = useVSCodeLaunch()
+  const { openVSCode } = useVSCodeLaunch()
   const [activeType, setActiveType] = useState<JourneyType>('feature_planning')
   const [activeStatusFilter, setActiveStatusFilter] = useState<StatusFilter>('active')
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
@@ -184,6 +184,37 @@ export function JourneysTab() {
         }
       })
   }, [journeys])
+
+  // Register all journeys with worktrees and projects for VS Code overlay tracking
+  useEffect(() => {
+    // Register journeys with worktrees
+    const journeysWithWorktrees = journeys.filter(j => j.worktree_path)
+    if (journeysWithWorktrees.length > 0 && selectedProject) {
+      window.electronAPI?.overlay?.registerBatch(
+        journeysWithWorktrees.map(j => ({
+          journeyId: j.id,
+          projectId: j.project_id,
+          projectName: selectedProject.name,
+          journeyName: j.name,
+          journeyType: j.type,
+          journeyStage: j.stage,
+          branchName: j.branch_name || undefined,
+          workspacePath: j.worktree_path!,
+        }))
+      )
+    }
+
+    // Register all projects for main branch detection
+    if (projects.length > 0) {
+      window.electronAPI?.overlay?.registerProjects(
+        projects.filter(p => p.root_path).map(p => ({
+          projectId: p.id,
+          projectName: p.name,
+          rootPath: p.root_path!,
+        }))
+      )
+    }
+  }, [journeys, selectedProject, projects])
 
   // Check git status when project changes
   useEffect(() => {
@@ -391,11 +422,9 @@ export function JourneysTab() {
     }
 
     try {
-      const result = await launchForJourney(journey, selectedProject)
+      const result = await openVSCode(journey, selectedProject)
       if (!result.success) {
         showToast(result.error || 'Failed to open VS Code', 'error')
-      } else if (result.isNewSession) {
-        showToast('Started new session', 'success')
       }
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to open VS Code', 'error')

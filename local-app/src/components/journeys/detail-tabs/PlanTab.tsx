@@ -19,6 +19,13 @@ interface PlanTabProps {
 
 type SortOrder = 'execution' | 'newest' | 'oldest'
 
+interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: Date
+  appliedChanges?: boolean
+}
+
 export function PlanTab({ journey, project, onStageChange }: PlanTabProps) {
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all')
   const [sortOrder, setSortOrder] = useState<SortOrder>('execution')
@@ -31,6 +38,20 @@ export function PlanTab({ journey, project, onStageChange }: PlanTabProps) {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
   const [isCreatingAll, setIsCreatingAll] = useState(false)
   const [showPublishPanel, setShowPublishPanel] = useState(false)
+
+  // Chat panel state
+  const [showChatPanel, setShowChatPanel] = useState(false)
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [chatInput, setChatInput] = useState('')
+  const [isChatProcessing, setIsChatProcessing] = useState(false)
+  const chatInputRef = useRef<HTMLTextAreaElement>(null)
+  const chatMessagesRef = useRef<HTMLDivElement>(null)
+
+  // Manual add form state
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [newJourneyName, setNewJourneyName] = useState('')
+  const [newJourneyDescription, setNewJourneyDescription] = useState('')
+  const [isFleshingOut, setIsFleshingOut] = useState(false)
 
   const { spec, loading: specLoading } = useJourneySpec(journey.id)
   const { journeys, createJourney, updateJourney, loading: journeysLoading } = useJourneys(journey.project_id)
@@ -425,16 +446,6 @@ export function PlanTab({ journey, project, onStageChange }: PlanTabProps) {
   const getLinkedJourney = (proposal: ProposedChildJourney) =>
     journeys.find(j => j.id === proposal.generated_journey_id)
 
-  if (specLoading || journeysLoading) {
-    return (
-      <div className="flex items-center justify-center h-48 text-gray-500 dark:text-gray-400">
-        Loading...
-      </div>
-    )
-  }
-
-  const hasSpec = !!spec?.content
-
   // Open spec in new window for side-by-side reading
   const handleViewSpec = useCallback(() => {
     if (!spec?.content) return
@@ -444,6 +455,231 @@ export function PlanTab({ journey, project, onStageChange }: PlanTabProps) {
       journeyId: journey.id,
     })
   }, [spec, journey.id, journey.name])
+
+  // Auto-scroll chat to bottom when new messages arrive
+  useEffect(() => {
+    if (chatMessagesRef.current) {
+      chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight
+    }
+  }, [chatMessages])
+
+  // Chat handler - sends message to AI and processes response
+  const handleChatSubmit = useCallback(async () => {
+    if (!chatInput.trim() || isChatProcessing) return
+
+    const userMessage: ChatMessage = {
+      role: 'user',
+      content: chatInput.trim(),
+      timestamp: new Date(),
+    }
+
+    setChatMessages(prev => [...prev, userMessage])
+    setChatInput('')
+    setIsChatProcessing(true)
+
+    try {
+      // Build context for AI
+      const proposalsContext = proposals.map(p => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        early_plan: p.early_plan,
+        status: p.status,
+        is_group: p.is_group,
+        checklist_items: p.checklist_items,
+      }))
+
+      const prompt = `You are helping refine proposed child journeys for a feature planning journey.
+
+CURRENT SPEC:
+${spec?.content || 'No spec available'}
+
+CURRENT PROPOSALS:
+${JSON.stringify(proposalsContext, null, 2)}
+
+USER REQUEST: ${userMessage.content}
+
+Based on the user's request, provide a helpful response. If the user is asking for changes to the proposals (like adding, updating, removing, or reorganizing), respond with:
+1. A brief explanation of what you'll do
+2. A JSON block with the changes in this format:
+
+\`\`\`json
+{
+  "action": "add" | "update" | "remove" | "reorder",
+  "changes": [
+    {
+      "type": "add",
+      "proposal": { "name": "...", "description": "...", "early_plan": "...", "checklist_items": ["..."] }
+    },
+    {
+      "type": "update",
+      "id": "proposal-id",
+      "updates": { "name": "...", "description": "..." }
+    },
+    {
+      "type": "remove",
+      "id": "proposal-id"
+    }
+  ]
+}
+\`\`\`
+
+If the user is just asking a question, answer it helpfully without including a JSON block.`
+
+      const result = await window.electronAPI.claude.query({
+        prompt,
+        workingDirectory: project?.root_path,
+        timeout: 60000,
+      })
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to get AI response')
+      }
+
+      const assistantContent = result.rawOutput || ''
+
+      // Try to extract and apply changes from JSON block
+      let appliedChanges = false
+      const jsonMatch = assistantContent.match(/```json\s*([\s\S]*?)```/)
+      if (jsonMatch) {
+        try {
+          const changesData = JSON.parse(jsonMatch[1])
+          if (changesData.changes && Array.isArray(changesData.changes)) {
+            for (const change of changesData.changes) {
+              if (change.type === 'add' && change.proposal) {
+                await addProposals([{
+                  name: change.proposal.name,
+                  description: change.proposal.description || '',
+                  early_plan: change.proposal.early_plan || '',
+                  checklist_items: change.proposal.checklist_items || [],
+                  status: 'draft',
+                  generated_journey_id: null,
+                  sort_order: proposals.length,
+                }])
+              } else if (change.type === 'update' && change.id) {
+                await updateProposal(change.id, change.updates)
+              } else if (change.type === 'remove' && change.id) {
+                await deleteProposal(change.id)
+              }
+            }
+            appliedChanges = true
+          }
+        } catch {
+          // JSON parsing failed, just show the response
+        }
+      }
+
+      const assistantMessage: ChatMessage = {
+        role: 'assistant',
+        content: assistantContent,
+        timestamp: new Date(),
+        appliedChanges,
+      }
+      setChatMessages(prev => [...prev, assistantMessage])
+    } catch (err) {
+      const errorMessage: ChatMessage = {
+        role: 'assistant',
+        content: `Error: ${err instanceof Error ? err.message : 'Unknown error occurred'}`,
+        timestamp: new Date(),
+      }
+      setChatMessages(prev => [...prev, errorMessage])
+    } finally {
+      setIsChatProcessing(false)
+    }
+  }, [chatInput, isChatProcessing, proposals, spec, project?.root_path, addProposals, updateProposal, deleteProposal])
+
+  // Manual add handler - creates a new proposal and optionally fleshes it out with AI
+  const handleManualAdd = useCallback(async (fleshOut: boolean) => {
+    if (!newJourneyName.trim()) return
+
+    if (fleshOut) {
+      setIsFleshingOut(true)
+      try {
+        const prompt = `Based on the following spec and the user's journey idea, create a detailed proposed child journey.
+
+SPEC:
+${spec?.content || 'No spec available'}
+
+JOURNEY IDEA:
+Name: ${newJourneyName}
+${newJourneyDescription ? `Description: ${newJourneyDescription}` : ''}
+
+Create a complete journey proposal with:
+1. A refined name (if needed)
+2. A detailed description
+3. An early implementation plan
+4. A checklist of specific tasks/items
+
+Respond with ONLY a JSON object in this format:
+{
+  "name": "Journey name",
+  "description": "Detailed description of what this journey accomplishes",
+  "early_plan": "Step by step implementation approach",
+  "checklist_items": ["Task 1", "Task 2", "Task 3"]
+}`
+
+        const result = await window.electronAPI.claude.query({
+          prompt,
+          workingDirectory: project?.root_path,
+          timeout: 30000,
+        })
+
+        if (result.success && result.rawOutput) {
+          // Try to parse JSON from the response
+          const jsonMatch = result.rawOutput.match(/\{[\s\S]*\}/)
+          if (jsonMatch) {
+            const proposal = JSON.parse(jsonMatch[0])
+            await addProposals([{
+              name: proposal.name || newJourneyName,
+              description: proposal.description || newJourneyDescription,
+              early_plan: proposal.early_plan || '',
+              checklist_items: proposal.checklist_items || [],
+              status: 'draft',
+              generated_journey_id: null,
+              sort_order: proposals.length,
+            }])
+          }
+        }
+      } catch (err) {
+        // Fall back to adding without AI
+        await addProposals([{
+          name: newJourneyName,
+          description: newJourneyDescription,
+          early_plan: '',
+          checklist_items: [],
+          status: 'draft',
+          generated_journey_id: null,
+          sort_order: proposals.length,
+        }])
+      } finally {
+        setIsFleshingOut(false)
+      }
+    } else {
+      await addProposals([{
+        name: newJourneyName,
+        description: newJourneyDescription,
+        early_plan: '',
+        checklist_items: [],
+        status: 'draft',
+        generated_journey_id: null,
+        sort_order: proposals.length,
+      }])
+    }
+
+    setNewJourneyName('')
+    setNewJourneyDescription('')
+    setShowAddForm(false)
+  }, [newJourneyName, newJourneyDescription, spec, project?.root_path, proposals.length, addProposals])
+
+  if (specLoading || journeysLoading) {
+    return (
+      <div className="flex items-center justify-center h-48 text-gray-500 dark:text-gray-400">
+        Loading...
+      </div>
+    )
+  }
+
+  const hasSpec = !!spec?.content
 
   return (
     <div className="flex flex-col h-full">
@@ -479,6 +715,28 @@ export function PlanTab({ journey, project, onStageChange }: PlanTabProps) {
               View Spec
             </Button>
           )}
+          <Button
+            onClick={() => setShowAddForm(!showAddForm)}
+            variant="secondary"
+            size="sm"
+            title="Add a journey manually"
+          >
+            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add
+          </Button>
+          <Button
+            onClick={() => setShowChatPanel(!showChatPanel)}
+            variant={showChatPanel ? 'primary' : 'secondary'}
+            size="sm"
+            title="Open chat to ask questions or request changes"
+          >
+            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            Chat
+          </Button>
           <Button
             onClick={handleGenerate}
             disabled={isGenerating || !hasSpec}
@@ -634,6 +892,69 @@ export function PlanTab({ journey, project, onStageChange }: PlanTabProps) {
         </div>
       )}
 
+      {/* Manual Add Form */}
+      {showAddForm && (
+        <div className="px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                Add New Journey Proposal
+              </span>
+            </div>
+            <div className="flex flex-col gap-2">
+              <input
+                type="text"
+                value={newJourneyName}
+                onChange={(e) => setNewJourneyName(e.target.value)}
+                placeholder="Journey name (e.g., 'Implement user authentication')"
+                className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white w-full"
+                autoFocus
+              />
+              <textarea
+                value={newJourneyDescription}
+                onChange={(e) => setNewJourneyDescription(e.target.value)}
+                placeholder="Optional: Brief description or notes..."
+                rows={2}
+                className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white w-full resize-none"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                onClick={() => handleManualAdd(true)}
+                disabled={!newJourneyName.trim() || isFleshingOut}
+                title="Add and let AI fill in the details"
+              >
+                {isFleshingOut ? 'Generating...' : 'Add & Flesh Out with AI'}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => handleManualAdd(false)}
+                disabled={!newJourneyName.trim() || isFleshingOut}
+                title="Add as-is without AI enhancement"
+              >
+                Add As-Is
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setShowAddForm(false)
+                  setNewJourneyName('')
+                  setNewJourneyDescription('')
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* No spec warning */}
       {!hasSpec && proposals.length === 0 && (
         <div className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
@@ -715,6 +1036,101 @@ export function PlanTab({ journey, project, onStageChange }: PlanTabProps) {
                 : `No ${activeFilter} journeys.`}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Chat Panel - slide up from bottom */}
+      {showChatPanel && (
+        <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex flex-col" style={{ height: '300px' }}>
+          <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Chat about Proposals
+              </span>
+            </div>
+            <button
+              onClick={() => setShowChatPanel(false)}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Chat Messages */}
+          <div
+            ref={chatMessagesRef}
+            className="flex-1 overflow-auto p-4 space-y-3"
+          >
+            {chatMessages.length === 0 && (
+              <div className="text-center text-gray-500 dark:text-gray-400 text-sm py-4">
+                <p>Ask questions or request changes to your proposals.</p>
+                <p className="text-xs mt-1">Examples: "Add a journey for error handling", "Split the auth journey into two", "What's missing from this plan?"</p>
+              </div>
+            )}
+            {chatMessages.map((msg, idx) => (
+              <div
+                key={idx}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-[80%] px-3 py-2 rounded-lg text-sm ${
+                    msg.role === 'user'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-600'
+                  }`}
+                >
+                  <p className="whitespace-pre-wrap">{msg.content.replace(/```json[\s\S]*?```/g, '[Changes applied]')}</p>
+                  {msg.appliedChanges && (
+                    <div className="mt-1 text-xs text-green-300 dark:text-green-400 flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Changes applied
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+            {isChatProcessing && (
+              <div className="flex justify-start">
+                <div className="bg-white dark:bg-gray-700 px-3 py-2 rounded-lg text-sm text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-600">
+                  Thinking...
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Chat Input */}
+          <div className="p-3 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex gap-2">
+              <textarea
+                ref={chatInputRef}
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleChatSubmit()
+                  }
+                }}
+                placeholder="Ask a question or request changes..."
+                rows={1}
+                className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
+              />
+              <Button
+                size="sm"
+                onClick={handleChatSubmit}
+                disabled={!chatInput.trim() || isChatProcessing}
+              >
+                Send
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -10,6 +10,7 @@ import { registerJourneyDetailIpc } from './ipc/journey-detail.ipc'
 import { registerTranscriptionsIpc } from './ipc/transcriptions.ipc'
 import { registerOverlayIpc } from './ipc/overlay.ipc'
 import { registerMarkdownViewerIpc } from './ipc/markdown-viewer.ipc'
+import { journeyOverlayWindowManager } from './services/journey-overlay-window'
 
 // Handle uncaught exceptions gracefully (e.g., EPIPE from child processes)
 process.on('uncaughtException', (error) => {
@@ -185,6 +186,9 @@ app.whenReady().then(async () => {
   registerTerminalIpc()
 
   createWindow()
+
+  // Start overlay polling immediately so it works for any VS Code window
+  journeyOverlayWindowManager.startPolling()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

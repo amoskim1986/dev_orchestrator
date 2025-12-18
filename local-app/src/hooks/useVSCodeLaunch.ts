@@ -170,6 +170,7 @@ export function useVSCodeLaunch() {
       await window.electronAPI.overlay?.show({
         journeyId: journey.id,
         projectId: project.id,
+        projectName: project.name,
         journeyName: journey.name,
         journeyType: journey.type,
         journeyStage: journey.stage,

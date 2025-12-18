@@ -430,6 +430,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onUpdate: (callback: (data: JourneyOverlayData) => void) => {
       ipcRenderer.on('overlay:update', (_event, data) => callback(data))
     },
+    onNoJourney: (callback: (data: { folderName: string }) => void) => {
+      ipcRenderer.on('overlay:noJourney', (_event, data) => callback(data))
+    },
+    onProjectOnly: (callback: (data: ProjectOverlayData) => void) => {
+      ipcRenderer.on('overlay:projectOnly', (_event, data) => callback(data))
+    },
     show: (data: JourneyOverlayData) =>
       ipcRenderer.invoke('overlay:show', data) as Promise<{ success: boolean }>,
     hide: () =>
@@ -438,6 +444,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('overlay:close') as Promise<{ success: boolean }>,
     openJourneyDetail: (journeyId: string, projectId: string) =>
       ipcRenderer.invoke('overlay:openJourneyDetail', journeyId, projectId) as Promise<{ success: boolean }>,
+    openProjectDetail: (projectId: string) =>
+      ipcRenderer.invoke('overlay:openProjectDetail', projectId) as Promise<{ success: boolean }>,
+    registerBatch: (journeys: JourneyOverlayData[]) =>
+      ipcRenderer.invoke('overlay:registerBatch', journeys) as Promise<{ success: boolean; count: number }>,
+    registerProjects: (projects: ProjectOverlayData[]) =>
+      ipcRenderer.invoke('overlay:registerProjects', projects) as Promise<{ success: boolean; count: number }>,
   },
 
   // Markdown Viewer API - Opens markdown content in a new window
@@ -461,11 +473,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
 interface JourneyOverlayData {
   journeyId: string
   projectId: string
+  projectName: string
   journeyName: string
   journeyType: string
   journeyStage: string
   branchName?: string
   workspacePath?: string
+}
+
+// Project overlay data type (for main branch / non-journey workspaces)
+interface ProjectOverlayData {
+  projectId: string
+  projectName: string
+  rootPath: string
 }
 
 // Markdown viewer data type
@@ -562,10 +582,15 @@ declare global {
       overlay: {
         onInit: (callback: (data: JourneyOverlayData) => void) => void
         onUpdate: (callback: (data: JourneyOverlayData) => void) => void
+        onNoJourney: (callback: (data: { folderName: string }) => void) => void
+        onProjectOnly: (callback: (data: ProjectOverlayData) => void) => void
         show: (data: JourneyOverlayData) => Promise<{ success: boolean }>
         hide: () => Promise<{ success: boolean }>
         close: () => Promise<{ success: boolean }>
         openJourneyDetail: (journeyId: string, projectId: string) => Promise<{ success: boolean }>
+        openProjectDetail: (projectId: string) => Promise<{ success: boolean }>
+        registerBatch: (journeys: JourneyOverlayData[]) => Promise<{ success: boolean; count: number }>
+        registerProjects: (projects: ProjectOverlayData[]) => Promise<{ success: boolean; count: number }>
       }
       markdownViewer: {
         onInit: (callback: (data: MarkdownViewerData) => void) => void

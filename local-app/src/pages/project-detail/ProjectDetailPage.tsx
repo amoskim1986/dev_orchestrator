@@ -4,9 +4,12 @@ import type { Project, ProjectUpdate, JourneyInsert, Journey } from '@dev-orches
 import { ProjectIntakeEditor } from '../../components/projects/ProjectIntakeEditor'
 import { IntakeChangesDialog } from '../../components/projects/IntakeChangesDialog'
 import { ProposedJourneysTab } from '../../components/projects/ProposedJourneysTab'
+import { JourneysList } from '../../components/journeys/JourneysList'
 import { SpeechToText } from '../../components/SpeechToText'
+import { Button } from '../../components/common/Button'
+import { ToastContainer, ToastData } from '../../components/common/Toast'
 
-type ProjectTab = 'description' | 'journeys'
+type ProjectTab = 'description' | 'proposed' | 'journeys'
 
 interface ChangesDialogData {
   changesSummary: string
@@ -48,9 +51,10 @@ export function ProjectDetailPage() {
     return 'description'
   })
   const [changesDialog, setChangesDialog] = useState<ChangesDialogData | null>(null)
+  const [toasts, setToasts] = useState<ToastData[]>([])
 
   // Get journeys for this project (for the proposed journeys tab)
-  const { journeys, createJourney, loading: journeysLoading } = useJourneys(projectId || undefined)
+  const { journeys, createJourney, updateJourney, deleteJourney, startJourney, loading: journeysLoading } = useJourneys(projectId || undefined)
 
   // Get the project from the list
   const project = projects.find(p => p.id === projectId) || null
@@ -126,6 +130,57 @@ export function ProjectDetailPage() {
     }
   }, [handleTitleSave])
 
+  // Toast helpers
+  const showToast = useCallback((message: string, type: ToastData['type'] = 'error') => {
+    const id = `toast-${Date.now()}`
+    setToasts(prev => [...prev, { id, message, type }])
+  }, [])
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id))
+  }, [])
+
+  // Handle opening in VS Code (just opens the folder)
+  const handleOpenInVSCode = useCallback(async () => {
+    if (!project?.root_path) {
+      showToast('No project path available', 'error')
+      return
+    }
+
+    try {
+      const result = await window.electronAPI.vscode.launch({
+        workingDirectory: project.root_path,
+        newWindow: true,
+      })
+      if (!result.success) {
+        showToast(result.error || 'Failed to open VS Code', 'error')
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to open VS Code', 'error')
+    }
+  }, [project?.root_path, showToast])
+
+  // Handle launching Claude Code (opens VS Code with Claude Code chat)
+  const handleLaunchClaudeCode = useCallback(async () => {
+    if (!project?.root_path) {
+      showToast('No project path available', 'error')
+      return
+    }
+
+    try {
+      const result = await window.electronAPI.vscode.launch({
+        workingDirectory: project.root_path,
+        newWindow: true,
+        maximizeChat: true,
+      })
+      if (!result.success) {
+        showToast(result.error || 'Failed to launch Claude Code', 'error')
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to launch Claude Code', 'error')
+    }
+  }, [project, showToast])
+
   if (loading || journeysLoading) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
@@ -184,15 +239,29 @@ export function ProjectDetailPage() {
           )}
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{project.root_path}</p>
         </div>
-        <span className={`text-xs px-2 py-1 rounded ${
-          intakeStatus === 'AI Generated'
-            ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400'
-            : intakeStatus === 'Raw Only'
-              ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-400'
-              : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
-        }`}>
-          {intakeStatus}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className={`text-xs px-2 py-1 rounded ${
+            intakeStatus === 'AI Generated'
+              ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400'
+              : intakeStatus === 'Raw Only'
+                ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-400'
+                : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+          }`}>
+            {intakeStatus}
+          </span>
+          <Button variant="secondary" size="sm" onClick={handleOpenInVSCode} title="Open in VS Code">
+            <svg className="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M17.5 0h-11L0 6v12l6.5 6h11L24 18V6L17.5 0zm-7.17 17.89L4.5 12l5.83-5.89 1.34 1.32L7.17 12l4.5 4.57-1.34 1.32zm3.34 0l-1.34-1.32L16.83 12l-4.5-4.57 1.34-1.32L19.5 12l-5.83 5.89z"/>
+            </svg>
+            VS Code
+          </Button>
+          <Button variant="primary" size="sm" onClick={handleLaunchClaudeCode} title="Open Claude Code">
+            <svg className="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M17.5 0h-11L0 6v12l6.5 6h11L24 18V6L17.5 0zm-7.17 17.89L4.5 12l5.83-5.89 1.34 1.32L7.17 12l4.5 4.57-1.34 1.32zm3.34 0l-1.34-1.32L16.83 12l-4.5-4.57 1.34-1.32L19.5 12l-5.83 5.89z"/>
+            </svg>
+            Claude Code
+          </Button>
+        </div>
       </div>
 
       {/* Project Info Summary */}
@@ -226,6 +295,21 @@ export function ProjectDetailPage() {
           Description
         </button>
         <button
+          onClick={() => setActiveTab('proposed')}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'proposed'
+              ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
+          }`}
+        >
+          Proposed Journeys
+          {(project.proposed_project_journeys?.length ?? 0) > 0 && (
+            <span className="ml-1.5 text-xs bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded-full">
+              {project.proposed_project_journeys?.length ?? 0}
+            </span>
+          )}
+        </button>
+        <button
           onClick={() => setActiveTab('journeys')}
           className={`px-4 py-2 text-sm font-medium transition-colors ${
             activeTab === 'journeys'
@@ -234,9 +318,9 @@ export function ProjectDetailPage() {
           }`}
         >
           Journeys
-          {(project.proposed_project_journeys?.length ?? 0) > 0 && (
+          {journeys.length > 0 && (
             <span className="ml-1.5 text-xs bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded-full">
-              {project.proposed_project_journeys?.length ?? 0}
+              {journeys.length}
             </span>
           )}
         </button>
@@ -250,12 +334,23 @@ export function ProjectDetailPage() {
             onUpdate={handleUpdate}
             onShowChangesDialog={handleShowChangesDialog}
           />
-        ) : (
+        ) : activeTab === 'proposed' ? (
           <ProposedJourneysTab
             project={project}
             journeys={journeys}
             onProjectUpdate={handleUpdate}
             onCreateJourney={handleCreateJourney}
+          />
+        ) : (
+          <JourneysList
+            project={project}
+            journeys={journeys}
+            loading={journeysLoading}
+            onCreateJourney={handleCreateJourney}
+            onUpdateJourney={updateJourney}
+            onDeleteJourney={deleteJourney}
+            onStartJourney={startJourney}
+            compact
           />
         )}
       </div>
@@ -274,6 +369,7 @@ export function ProjectDetailPage() {
       )}
 
       <SpeechToText />
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   )
 }

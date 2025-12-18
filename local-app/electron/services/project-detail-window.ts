@@ -1,5 +1,67 @@
-import { BrowserWindow, app } from 'electron'
+import { BrowserWindow, app, Menu } from 'electron'
 import * as path from 'path'
+
+// Create a minimal menu with standard shortcuts for detail windows
+function createDetailWindowMenu(): Menu {
+  const isMac = process.platform === 'darwin'
+  return Menu.buildFromTemplate([
+    ...(isMac ? [{
+      label: app.name,
+      submenu: [
+        { role: 'about' as const },
+        { type: 'separator' as const },
+        { role: 'hide' as const },
+        { role: 'hideOthers' as const },
+        { role: 'unhide' as const },
+        { type: 'separator' as const },
+        { role: 'quit' as const },
+      ]
+    }] : []),
+    {
+      label: 'File',
+      submenu: [
+        { role: isMac ? 'close' as const : 'quit' as const },
+      ]
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' as const },
+        { role: 'redo' as const },
+        { type: 'separator' as const },
+        { role: 'cut' as const },
+        { role: 'copy' as const },
+        { role: 'paste' as const },
+        { role: 'selectAll' as const },
+      ]
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' as const },
+        { role: 'forceReload' as const },
+        { role: 'toggleDevTools' as const },
+        { type: 'separator' as const },
+        { role: 'resetZoom' as const },
+        { role: 'zoomIn' as const },
+        { role: 'zoomOut' as const },
+      ]
+    },
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' as const },
+        { role: 'zoom' as const },
+        ...(isMac ? [
+          { type: 'separator' as const },
+          { role: 'front' as const },
+        ] : [
+          { role: 'close' as const },
+        ]),
+      ]
+    },
+  ])
+}
 
 // Helper to generate UUID without external dependency
 function generateId(): string {
@@ -45,6 +107,12 @@ class ProjectDetailWindowManager {
         nodeIntegration: false,
         contextIsolation: true,
       },
+    })
+
+    // Set menu for this window (enables Cmd+W to close)
+    const menu = createDetailWindowMenu()
+    window.on('focus', () => {
+      Menu.setApplicationMenu(menu)
     })
 
     this.windows.set(id, window)

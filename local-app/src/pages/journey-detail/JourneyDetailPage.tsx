@@ -15,6 +15,7 @@ import {
   type JourneyTab,
 } from '../../components/journeys/detail-tabs'
 import { SpeechToText } from '../../components/SpeechToText'
+import { ErrorBoundary } from '../../components/common/ErrorBoundary'
 
 interface JourneyTabData {
   journeyId: string
@@ -55,7 +56,7 @@ export function JourneyDetailPage() {
   const activeTab = tabs.find(t => t.journeyId === activeTabId)
   const { journeys, updateJourney, deleteJourney, loading } = useJourneys(activeTab?.projectId)
   const { projects } = useProjects()
-  const { openVSCode, launchClaudeCode } = useVSCodeLaunch()
+  const { openVSCode } = useVSCodeLaunch()
 
   // Get the active journey from the journeys list
   const activeJourney = journeys.find(j => j.id === activeTabId) || null
@@ -163,24 +164,28 @@ export function JourneyDetailPage() {
     }
   }, [activeJourney, activeProject, openVSCode, showToast])
 
-  // Handle launching Claude Code in VS Code (starts new chat)
+  // Handle launching Claude Code in VS Code (opens VS Code with Claude Code chat)
   const handleLaunchClaudeCode = useCallback(async () => {
     if (!activeJourney || !activeProject) {
       showToast('Journey or project not found', 'error')
       return
     }
 
+    const workingPath = activeJourney.worktree_path || activeProject.root_path
+
     try {
-      const result = await launchClaudeCode(activeJourney, activeProject)
+      const result = await window.electronAPI.vscode.launch({
+        workingDirectory: workingPath,
+        newWindow: true,
+        maximizeChat: true,
+      })
       if (!result.success) {
         showToast(result.error || 'Failed to launch Claude Code', 'error')
-      } else if (result.isNewSession) {
-        showToast('Started new session', 'success')
       }
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to launch Claude Code', 'error')
     }
-  }, [activeJourney, activeProject, launchClaudeCode, showToast])
+  }, [activeJourney, activeProject, showToast])
 
   // Handle delete journey
   const handleDelete = useCallback(async () => {
@@ -308,6 +313,21 @@ export function JourneyDetailPage() {
           {/* Journey Header */}
           <div className="flex items-start justify-between p-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
             <div className="flex-1 min-w-0 pr-4">
+              {/* Breadcrumb: Project > Journey */}
+              <div className="flex items-center gap-1.5 text-sm mb-1">
+                <button
+                  onClick={() => {
+                    if (activeProject?.id) {
+                      window.electronAPI.projectDetail.open(activeProject.id)
+                    }
+                  }}
+                  className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline transition-colors"
+                >
+                  {activeProject?.name || 'Project'}
+                </button>
+                <span className="text-gray-400 dark:text-gray-500">&gt;</span>
+                <span className="text-gray-600 dark:text-gray-300 truncate">{activeJourney.name}</span>
+              </div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white truncate">{activeJourney.name}</h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 {activeJourney.type.replace('_', ' ')} &bull; {activeJourney.stage.replace(/_/g, ' ')}
@@ -343,7 +363,9 @@ export function JourneyDetailPage() {
 
           {/* Tab Content */}
           <div className="flex-1 overflow-y-auto p-4">
-            {renderTabContent()}
+            <ErrorBoundary>
+              {renderTabContent()}
+            </ErrorBoundary>
           </div>
         </>
       )}
